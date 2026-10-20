@@ -1,0 +1,33 @@
+Portable Karma runtime dependencies
+
+Node.js v22.23.3 (Windows x64)
+  Binary copied without modification from the locally installed REA.
+  License and third-party component notices: licenses/Node-22.23.3-LICENSE.txt
+  Exact-version notice source:
+  https://raw.githubusercontent.com/nodejs/node/v22.23.3/LICENSE
+  Source: https://github.com/nodejs/node/tree/v22.23.3
+
+Frida 17.23.2
+  JavaScript and native binding copied without modification from installed REA.
+  Declared license: LGPL-2.0 WITH WxWindows-exception-3.1
+  Supplements retained from installed REA:
+  licenses/frida-17.23.2-COPYING.txt and licenses/LGPL-2.0.txt
+  Source: https://github.com/frida/frida-node/tree/17.23.2
+  The installed Frida npm package contains no standalone license/copyright
+  document. REA supplies the two license texts above and explicitly notes they
+  are supplements, not recovered Node-binding or prebuild-component copyright
+  notices. This bundle preserves that limitation; it does not assert a complete
+  inventory of notices for components statically linked into the native binary.
+
+JavaScript runtime dependencies (original package license files retained):
+  bindings 1.5.0: node_modules/bindings/LICENSE.md (MIT)
+  file-uri-to-path 1.0.0: node_modules/file-uri-to-path/LICENSE (MIT)
+  minimatch 10.2.6: node_modules/minimatch/LICENSE.md (BlueOak-1.0.0)
+  brace-expansion 5.0.12: node_modules/brace-expansion/LICENSE (MIT)
+  balanced-match 4.0.4: node_modules/balanced-match/LICENSE.md (MIT)
+
+Only runtime JavaScript, package metadata, the native binding, executable, and
+license notices are copied. npm, installer dependencies, tests, declaration
+files, and source maps are not required to run the launcher and are omitted.
+Package metadata is preserved unmodified, including its original build/install
+dependency declarations; those tools are not required for an existing binary.

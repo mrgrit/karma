@@ -1,0 +1,1939 @@
+{
+  "schemaVersion": 1,
+  "gameDataRoot": "Data",
+  "maps": [
+    {
+      "id": "NMP_Riflematch",
+      "name": "Riflematch",
+      "enName": "Riflematch",
+      "age": 0,
+      "sourceIndex": 0,
+      "modes": [
+        5
+      ],
+      "launchIndices": {
+        "0:5": 0
+      },
+      "thumbnail": "Data/Image/map/NMP_Riflematch.bmp",
+      "world": "NMP_Riflematch.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_sektor312",
+      "name": "Enemy at the gate",
+      "enName": "Enemy at the gate",
+      "age": 0,
+      "sourceIndex": 1,
+      "modes": [
+        4
+      ],
+      "launchIndices": {
+        "0:4": 0
+      },
+      "thumbnail": "Data/Image/map/NMP_sektor312.bmp",
+      "world": "NMP_sektor312.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_mirrorsniper",
+      "name": "Honor",
+      "enName": "Honor",
+      "age": 0,
+      "sourceIndex": 2,
+      "modes": [
+        4
+      ],
+      "launchIndices": {
+        "0:4": 1
+      },
+      "thumbnail": "Data/Image/map/NMP_mirrorsniper.bmp",
+      "world": "NMP_mirrorsniper.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_ryuba",
+      "name": "Mass of Winter",
+      "enName": "Mass of Winter",
+      "age": 0,
+      "sourceIndex": 3,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 0,
+        "0:2": 0,
+        "0:3": 0
+      },
+      "thumbnail": "Data/Image/map/NMP_ryuba.bmp",
+      "world": "NMP_ryuba.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_Drain",
+      "name": "Drain",
+      "enName": "Drain",
+      "age": 0,
+      "sourceIndex": 4,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 1,
+        "0:2": 1,
+        "0:3": 1
+      },
+      "thumbnail": "Data/Image/map/NMP_Drain.bmp",
+      "world": "NMP_Drain.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_pastoraltown",
+      "name": "Pastoraltown",
+      "enName": "Pastoraltown",
+      "age": 0,
+      "sourceIndex": 5,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 2,
+        "0:2": 2,
+        "0:3": 2
+      },
+      "thumbnail": "Data/Image/map/NMP_pastoraltown.bmp",
+      "world": "NMP_pastoraltown.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_bunker",
+      "name": "Bunker",
+      "enName": "Bunker",
+      "age": 0,
+      "sourceIndex": 6,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 3,
+        "0:2": 3,
+        "0:3": 3
+      },
+      "thumbnail": "Data/Image/map/NMP_bunker.bmp",
+      "world": "NMP_bunker.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_rescue",
+      "name": "Rescue",
+      "enName": "Rescue",
+      "age": 0,
+      "sourceIndex": 7,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 4,
+        "0:2": 4
+      },
+      "thumbnail": "Data/Image/map/NMP_rescue.bmp",
+      "world": "NMP_rescue.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_factory2",
+      "name": "Factory 2",
+      "enName": "Factory 2",
+      "age": 0,
+      "sourceIndex": 8,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 5,
+        "0:2": 5
+      },
+      "thumbnail": "Data/Image/map/NMP_factory2.bmp",
+      "world": "NMP_factory2.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_alexander",
+      "name": "Alexander",
+      "enName": "Alexander",
+      "age": 0,
+      "sourceIndex": 9,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 6,
+        "0:2": 6
+      },
+      "thumbnail": "Data/Image/map/NMP_alexander.bmp",
+      "world": "NMP_alexander.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_Factory",
+      "name": "Factory",
+      "enName": "Factory",
+      "age": 0,
+      "sourceIndex": 10,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 7,
+        "0:2": 7
+      },
+      "thumbnail": "Data/Image/map/NMP_Factory.bmp",
+      "world": "NMP_Factory.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_Castle",
+      "name": "Castle",
+      "enName": "Castle",
+      "age": 0,
+      "sourceIndex": 11,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 8,
+        "0:2": 8,
+        "0:3": 4
+      },
+      "thumbnail": "Data/Image/map/NMP_Castle.bmp",
+      "world": "NMP_Castle.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_park",
+      "name": "Village",
+      "enName": "Village",
+      "age": 0,
+      "sourceIndex": 12,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 9,
+        "0:2": 9,
+        "0:3": 5
+      },
+      "thumbnail": "Data/Image/map/NMP_Park.bmp",
+      "world": "NMP_park.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_Baggage",
+      "name": "Baggage",
+      "enName": "Baggage",
+      "age": 0,
+      "sourceIndex": 13,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 10,
+        "0:2": 10,
+        "0:3": 6
+      },
+      "thumbnail": "Data/Image/map/NMP_Baggage.bmp",
+      "world": "NMP_Baggage.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_Flowerbed",
+      "name": "Flowerbed",
+      "enName": "Flowerbed",
+      "age": 0,
+      "sourceIndex": 14,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 11,
+        "0:2": 11
+      },
+      "thumbnail": "Data/Image/map/NMP_Flowerbed.bmp",
+      "world": "NMP_Flowerbed.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_training",
+      "name": "Training camp",
+      "enName": "Training camp",
+      "age": 0,
+      "sourceIndex": 15,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 12,
+        "0:2": 12
+      },
+      "thumbnail": "Data/Image/map/NMP_training.bmp",
+      "world": "NMP_training.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_armedtrain",
+      "name": "Armed Train",
+      "enName": "Armed Train",
+      "age": 0,
+      "sourceIndex": 16,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 13,
+        "0:2": 13
+      },
+      "thumbnail": "Data/Image/map/NMP_armedtrain.bmp",
+      "world": "NMP_armedtrain.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_partisan",
+      "name": "Partisan",
+      "enName": "Partisan",
+      "age": 0,
+      "sourceIndex": 17,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 14,
+        "0:2": 14
+      },
+      "thumbnail": "Data/Image/map/NMP_partisan.bmp",
+      "world": "NMP_partisan.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_laboratory",
+      "name": "Laboratory",
+      "enName": "Laboratory",
+      "age": 0,
+      "sourceIndex": 18,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "0:1": 15,
+        "0:2": 15
+      },
+      "thumbnail": "Data/Image/map/NMP_laboratory.bmp",
+      "world": "NMP_laboratory.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_poland",
+      "name": "Poland",
+      "enName": "Poland",
+      "age": 0,
+      "sourceIndex": 19,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 16,
+        "0:2": 16,
+        "0:3": 7
+      },
+      "thumbnail": "Data/Image/map/NMP_poland.bmp",
+      "world": "NMP_poland.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMP_petersburg",
+      "name": "Petersburg",
+      "enName": "Petersburg",
+      "age": 0,
+      "sourceIndex": 20,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "0:1": 17,
+        "0:2": 17,
+        "0:3": 8
+      },
+      "thumbnail": "Data/Image/map/NMP_petersburg.bmp",
+      "world": "NMP_petersburg.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_warmachine",
+      "name": "Warmachine",
+      "enName": "Warmachine",
+      "age": 1,
+      "sourceIndex": 0,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "1:1": 0,
+        "1:2": 0
+      },
+      "thumbnail": "Data/Image/map/NMF_warmachine.bmp",
+      "world": "NMF_warmachine.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_hall of the infinity",
+      "name": "Infinity",
+      "enName": "Infinity",
+      "age": 1,
+      "sourceIndex": 1,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "1:1": 1,
+        "1:2": 1
+      },
+      "thumbnail": "Data/Image/map/NMF_hall of the infinity.bmp",
+      "world": "NMF_hall of the infinity.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_Rielab",
+      "name": "Rie lab",
+      "enName": "Rie lab",
+      "age": 1,
+      "sourceIndex": 2,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "1:1": 2,
+        "1:2": 2,
+        "1:3": 0
+      },
+      "thumbnail": "Data/Image/map/NMF_Rielab.bmp",
+      "world": "NMF_Rielab.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_Pyramid",
+      "name": "Pyramid",
+      "enName": "Pyramid",
+      "age": 1,
+      "sourceIndex": 3,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "1:1": 3,
+        "1:2": 3
+      },
+      "thumbnail": "Data/Image/map/NMF_Pyramid.bmp",
+      "world": "NMF_Pyramid.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_Shuttle",
+      "name": "1 VS 1",
+      "enName": "1 VS 1",
+      "age": 1,
+      "sourceIndex": 4,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "1:1": 4,
+        "1:2": 4
+      },
+      "thumbnail": "Data/Image/map/NMF_Shuttle.bmp",
+      "world": "NMF_Shuttle.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_nuclear",
+      "name": "Nuclear Plant",
+      "enName": "Nuclear Plant",
+      "age": 1,
+      "sourceIndex": 5,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "1:1": 5,
+        "1:2": 5
+      },
+      "thumbnail": "Data/Image/map/NMF_Nuclear.bmp",
+      "world": "NMF_nuclear.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_Glasstube",
+      "name": "Glasstube",
+      "enName": "Glasstube",
+      "age": 1,
+      "sourceIndex": 6,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "1:1": 6,
+        "1:2": 6,
+        "1:3": 1
+      },
+      "thumbnail": "Data/Image/map/NMF_Glasstube.bmp",
+      "world": "NMF_Glasstube.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_space",
+      "name": "Space",
+      "enName": "Space",
+      "age": 1,
+      "sourceIndex": 7,
+      "modes": [
+        1,
+        2,
+        3
+      ],
+      "launchIndices": {
+        "1:1": 7,
+        "1:2": 7,
+        "1:3": 2
+      },
+      "thumbnail": "Data/Image/map/NMF_space.bmp",
+      "world": "NMF_space.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_underground",
+      "name": "Underground",
+      "enName": "Underground",
+      "age": 1,
+      "sourceIndex": 8,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "1:1": 8,
+        "1:2": 8
+      },
+      "thumbnail": "Data/Image/map/NMF_underground.bmp",
+      "world": "NMF_underground.fsd",
+      "description": "",
+      "source": "maplist"
+    },
+    {
+      "id": "NMF_neofactory",
+      "name": "Neofactory",
+      "enName": "Neofactory",
+      "age": 1,
+      "sourceIndex": 9,
+      "modes": [
+        1,
+        2
+      ],
+      "launchIndices": {
+        "1:1": 9,
+        "1:2": 9
+      },
+      "thumbnail": "Data/Image/map/NMF_neofactory.bmp",
+      "world": "NMF_neofactory.fsd",
+      "description": "",
+      "source": "maplist"
+    }
+  ],
+  "characters": [
+    {
+      "id": "cpom_050",
+      "name": "에르빈",
+      "enName": "Erbin",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 0,
+      "thumbnail": "Data/Image/photo_character/1/Erbin.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpom_050.bmp",
+      "model": "Data/Being/Past/cpom_050/Cpom_050.chr",
+      "assetId": "cpom_050",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpoo_030",
+      "name": "칼",
+      "enName": "Khal",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 1,
+      "thumbnail": "Data/Image/photo_character/1/Khal.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpoo_030.bmp",
+      "model": "Data/Being/Past/cpoo_030/CPOO_030.chr",
+      "assetId": "cpoo_030",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpos_030",
+      "name": "군터",
+      "enName": "Gunter",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 2,
+      "thumbnail": "Data/Image/photo_character/1/Gunter.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpos_030.bmp",
+      "model": "Data/Being/Past/cpos_030/Cpos_030.chr",
+      "assetId": "cpos_030",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpom_010",
+      "name": "니만트",
+      "enName": "cpom_010",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 3,
+      "thumbnail": "Data/Image/photo_character/1/cpom_010.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpom_010.bmp",
+      "model": "Data/Being/Past/cpom_010/cpom_010.chr",
+      "assetId": "cpom_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpom_020",
+      "name": "구데리안",
+      "enName": "cpom_020",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 4,
+      "thumbnail": "Data/Image/photo_character/1/cpom_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpom_020.bmp",
+      "model": "Data/Being/Past/cpom_020/cpom_020.chr",
+      "assetId": "cpom_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpom_040",
+      "name": "발더스",
+      "enName": "cpom_040",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 5,
+      "thumbnail": "Data/Image/photo_character/1/cpom_040.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpom_040.bmp",
+      "model": "Data/Being/Past/cpom_040/cpom_040.chr",
+      "assetId": "cpom_040",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpos_010",
+      "name": "파렌할트",
+      "enName": "cpos_010",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 6,
+      "thumbnail": "Data/Image/photo_character/1/cpos_010.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpos_010.bmp",
+      "model": "Data/Being/Past/cpos_010/cpos_010.chr",
+      "assetId": "cpos_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpos_021",
+      "name": "슈나이더",
+      "enName": "cpos_021",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 7,
+      "thumbnail": "Data/Image/photo_character/1/cpos_021.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpos_021.bmp",
+      "model": "Data/Being/Past/cpos_021/cpos_021.chr",
+      "assetId": "cpos_021",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpos_033",
+      "name": "프란츠",
+      "enName": "cpos_033",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 8,
+      "thumbnail": "Data/Image/photo_character/1/cpos_033.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpos_033.bmp",
+      "model": "Data/Being/Past/cpos_033/cpos_033.chr",
+      "assetId": "cpos_033",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpos_040",
+      "name": "칸",
+      "enName": "cpos_040",
+      "age": 0,
+      "camp": 0,
+      "faction": "독일군",
+      "characterIndex": 9,
+      "thumbnail": "Data/Image/photo_character/1/cpos_040.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpos_040.bmp",
+      "model": "Data/Being/Past/cpos_040/cpos_040.chr",
+      "assetId": "cpos_040",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpes_010",
+      "name": "쥬코프",
+      "enName": "Jucoff",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 0,
+      "thumbnail": "Data/Image/photo_character/2/Jucoff.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpes_010.bmp",
+      "model": "Data/Being/Past/cpes_010/Cpes_010.chr",
+      "assetId": "cpes_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpeo_010",
+      "name": "이반",
+      "enName": "Ivan",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 1,
+      "thumbnail": "Data/Image/photo_character/2/Ivan.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpeo_010.bmp",
+      "model": "Data/Being/Past/cpeo_010/CPEO_010.chr",
+      "assetId": "cpeo_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpes_050",
+      "name": "류바",
+      "enName": "Ryuva",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 2,
+      "thumbnail": "Data/Image/photo_character/2/Ryuva.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpes_050.bmp",
+      "model": "Data/Being/Past/cpes_050/CPES_050.chr",
+      "assetId": "cpes_050",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpes_020",
+      "name": "피터",
+      "enName": "cpes_020",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 3,
+      "thumbnail": "Data/Image/photo_character/2/cpes_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpes_020.bmp",
+      "model": "Data/Being/Past/cpes_020/cpes_020.chr",
+      "assetId": "cpes_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpes_040",
+      "name": "알렉산더",
+      "enName": "cpen_010",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 4,
+      "thumbnail": "Data/Image/photo_character/2/cpen_010.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpes_040.bmp",
+      "model": "Data/Being/Past/cpes_040/cpes_040.chr",
+      "assetId": "cpes_040",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpeg_050",
+      "name": "아이린",
+      "enName": "cpeg_050",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 5,
+      "thumbnail": "Data/Image/photo_character/2/cpeg_050.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpeg_050.bmp",
+      "model": "Data/Being/Past/cpeg_050/cpeg_050.chr",
+      "assetId": "cpeg_050",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpep_010",
+      "name": "로딘",
+      "enName": "cpep_010",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 6,
+      "thumbnail": "Data/Image/photo_character/2/cpep_010.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpep_010.bmp",
+      "model": "Data/Being/Past/cpep_010/cpep_010.chr",
+      "assetId": "cpep_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpep_020",
+      "name": "쟈토프",
+      "enName": "cpes_010",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 7,
+      "thumbnail": "Data/Image/photo_character/2/cpes_010.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpep_020.bmp",
+      "model": "Data/Being/Past/cpep_020/cpep_020.chr",
+      "assetId": "cpep_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cper_020",
+      "name": "블라디미르",
+      "enName": "cper_020",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 8,
+      "thumbnail": "Data/Image/photo_character/2/cper_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cper_020.bmp",
+      "model": "Data/Being/Past/cper_020/cper_020.chr",
+      "assetId": "cper_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cpes_060",
+      "name": "카스파로브",
+      "enName": "cpes_060",
+      "age": 0,
+      "camp": 1,
+      "faction": "러시아군",
+      "characterIndex": 9,
+      "thumbnail": "Data/Image/photo_character/2/cpes_060.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cpes_060.bmp",
+      "model": "Data/Being/Past/cpes_060/cpes_060.chr",
+      "assetId": "cpes_060",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfom_040",
+      "name": "NO.13",
+      "enName": "No13",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 0,
+      "thumbnail": "Data/Image/photo_character/3/No13.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfom_040.bmp",
+      "model": "Data/Being/Future/cfom_040/Cfom_040.chr",
+      "assetId": "cfom_040",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfos_030",
+      "name": "NO.7",
+      "enName": "No7",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 1,
+      "thumbnail": "Data/Image/photo_character/3/No7.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfos_030.bmp",
+      "model": "Data/Being/Future/cfos_030/Cfos_030.chr",
+      "assetId": "cfos_030",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfos_120",
+      "name": "NO.44",
+      "enName": "No44",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 2,
+      "thumbnail": "Data/Image/photo_character/3/No44.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfos_120.bmp",
+      "model": "Data/Being/Future/cfos_120/Cfos_120.chr",
+      "assetId": "cfos_120",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfoa_030",
+      "name": "NO.9",
+      "enName": "cfoa_030",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 3,
+      "thumbnail": "Data/Image/photo_character/3/cfoa_030.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfoa_030.bmp",
+      "model": "Data/Being/Future/cfoa_030/cfoa_030.chr",
+      "assetId": "cfoa_030",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfom_020",
+      "name": "불맨",
+      "enName": "cfom_020",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 4,
+      "thumbnail": "Data/Image/photo_character/3/cfom_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfom_020.bmp",
+      "model": "Data/Being/Future/cfom_020/cfom_020.chr",
+      "assetId": "cfom_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfoo_010",
+      "name": "가드 파이퍼",
+      "enName": "cfoo_010",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 5,
+      "thumbnail": "Data/Image/photo_character/3/cfoo_010.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfoo_010.bmp",
+      "model": "Data/Being/Future/cfoo_010/cfoo_010.chr",
+      "assetId": "cfoo_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfoo_020",
+      "name": "한스",
+      "enName": "cfoo_020",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 6,
+      "thumbnail": "Data/Image/photo_character/3/cfoo_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfoo_020.bmp",
+      "model": "Data/Being/Future/cfoo_020/cfoo_020.chr",
+      "assetId": "cfoo_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfos_040",
+      "name": "조나단",
+      "enName": "cfos_040",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 7,
+      "thumbnail": "Data/Image/photo_character/3/cfos_040.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfos_040.bmp",
+      "model": "Data/Being/Future/cfos_040/cfos_040.chr",
+      "assetId": "cfos_040",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfos_100",
+      "name": "리키",
+      "enName": "cfos_100",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 8,
+      "thumbnail": "Data/Image/photo_character/3/cfos_100.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfos_100.bmp",
+      "model": "Data/Being/Future/cfos_100/cfos_100.chr",
+      "assetId": "cfos_100",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfos_130",
+      "name": "맥나이트",
+      "enName": "cfos_130",
+      "age": 1,
+      "camp": 0,
+      "faction": "EMPIRE",
+      "characterIndex": 9,
+      "thumbnail": "Data/Image/photo_character/3/cfos_130.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfos_130.bmp",
+      "model": "Data/Being/Future/cfos_130/cfos_130.chr",
+      "assetId": "cfos_130",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfee_011",
+      "name": "슐츠",
+      "enName": "Shultz",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 0,
+      "thumbnail": "Data/Image/photo_character/4/Shultz.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfee_011.bmp",
+      "model": "Data/Being/Future/cfee_011/Cfee_011.chr",
+      "assetId": "cfee_011",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfeg_010",
+      "name": "마이클",
+      "enName": "Mickle",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 1,
+      "thumbnail": "Data/Image/photo_character/4/Mickle.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfeg_010.bmp",
+      "model": "Data/Being/Future/cfeg_010/CFEG_010.chr",
+      "assetId": "cfeg_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfes_011",
+      "name": "썬더",
+      "enName": "Thunder",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 2,
+      "thumbnail": "Data/Image/photo_character/4/Thunder.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfes_011.bmp",
+      "model": "Data/Being/Future/cfes_011/CFES_011.chr",
+      "assetId": "cfes_011",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfeg_020",
+      "name": "미하일",
+      "enName": "cfeg_020",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 3,
+      "thumbnail": "Data/Image/photo_character/4/cfeg_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfeg_020.bmp",
+      "model": "Data/Being/Future/cfeg_020/cfeg_020.chr",
+      "assetId": "cfeg_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfee_010",
+      "name": "윌리엄",
+      "enName": "cfee_010",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 4,
+      "thumbnail": "Data/Image/photo_character/4/cfee_010.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfee_010.bmp",
+      "model": "Data/Being/Future/cfee_010/cfee_010.chr",
+      "assetId": "cfee_010",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfen_020",
+      "name": "류바",
+      "enName": "cfen_020",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 5,
+      "thumbnail": "Data/Image/photo_character/4/cfen_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfen_020.bmp",
+      "model": "Data/Being/Future/cfen_020/cfen_020.chr",
+      "assetId": "cfen_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfoe_041",
+      "name": "웨인",
+      "enName": "cfoe_041",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 6,
+      "thumbnail": "Data/Image/photo_character/4/cfoe_041.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfoe_041.bmp",
+      "model": "Data/Being/Future/cfoe_041/cfoe_041.chr",
+      "assetId": "cfoe_041",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfoe_043",
+      "name": "빅터",
+      "enName": "cfoe_043",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 7,
+      "thumbnail": "Data/Image/photo_character/4/cfoe_043.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfoe_043.bmp",
+      "model": "Data/Being/Future/cfoe_043/cfoe_043.chr",
+      "assetId": "cfoe_043",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfee_020",
+      "name": "첼시",
+      "enName": "cfee_020",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 8,
+      "thumbnail": "Data/Image/photo_character/4/cfee_020.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfee_020.bmp",
+      "model": "Data/Being/Future/cfee_020/cfee_020.chr",
+      "assetId": "cfee_020",
+      "description": "",
+      "source": "character-native"
+    },
+    {
+      "id": "cfer_000",
+      "name": "DR.아힘사",
+      "enName": "cfer_000",
+      "age": 1,
+      "camp": 1,
+      "faction": "R.I.E.",
+      "characterIndex": 9,
+      "thumbnail": "Data/Image/photo_character/4/cfer_000.bmp",
+      "infoImage": "Data/MENU/Shop/charInfo/cfer_000.bmp",
+      "model": "Data/Being/Future/cfer_000/cfer_000.chr",
+      "assetId": "cfer_000",
+      "description": "",
+      "source": "character-native"
+    }
+  ],
+  "weapons": [
+    {
+      "id": "0:0",
+      "weaponId": 0,
+      "name": "나이프",
+      "enName": "Knife",
+      "age": 0,
+      "category": "근접",
+      "thumbnail": "Data/MENU/Shop/wimage/apom_knife.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_knife.bmp",
+      "infoImage": null,
+      "assetId": "apom_knife",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:1",
+      "weaponId": 1,
+      "name": "루가 P08",
+      "enName": "Luger P08",
+      "age": 0,
+      "category": "권총",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_lug.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_lug.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/lugar.bmp",
+      "assetId": "apop_lug",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:2",
+      "weaponId": 2,
+      "name": "토카레프 TT33",
+      "enName": "Tokarev TT33",
+      "age": 0,
+      "category": "권총",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_tt33.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_tt33.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/tt33.bmp",
+      "assetId": "apeo_tt33",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:3",
+      "weaponId": 3,
+      "name": "Kar.98k 소총",
+      "enName": "Kar.98k",
+      "age": 0,
+      "category": "소총",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_kar.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_kar.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/kar98.bmp",
+      "assetId": "apop_kar",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:4",
+      "weaponId": 4,
+      "name": "Kar.98k 유탄",
+      "enName": "Kar.98k Grenade",
+      "age": 0,
+      "category": "유탄",
+      "thumbnail": "Data/MENU/Shop/wimage/apor_uka.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_HE.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/kar98u.bmp",
+      "assetId": "apor_uka",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:5",
+      "weaponId": 5,
+      "name": "Kar.98k 저격소총",
+      "enName": "Kar.98k Sniper",
+      "age": 0,
+      "category": "저격소총",
+      "thumbnail": "Data/MENU/Shop/wimage/apos_sni.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_ZFK43scope.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/kar98sni.bmp",
+      "assetId": "apos_sni",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:6",
+      "weaponId": 6,
+      "name": "석궁",
+      "enName": "Crossbow",
+      "age": 0,
+      "category": "석궁",
+      "thumbnail": "Data/MENU/Shop/wimage/apos_bow.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_bow.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/crossbow.bmp",
+      "assetId": "apos_bow",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:7",
+      "weaponId": 7,
+      "name": "M1891 소총",
+      "enName": "M1891",
+      "age": 0,
+      "category": "소총",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_m189.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_m1891.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/m189.bmp",
+      "assetId": "apeo_m189",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:8",
+      "weaponId": 8,
+      "name": "M1891 저격소총",
+      "enName": "M1891 Sniper",
+      "age": 0,
+      "category": "저격소총",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_sni.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_m91-30PU.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/m189sni.bmp",
+      "assetId": "apeo_sni",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:9",
+      "weaponId": 9,
+      "name": "MP38",
+      "enName": "MP38",
+      "age": 0,
+      "category": "기관단총",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_mp3.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_mp38.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/mp38.bmp",
+      "assetId": "apop_mp3",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:10",
+      "weaponId": 10,
+      "name": "FG42",
+      "enName": "FG42",
+      "age": 0,
+      "category": "돌격소총",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_fg42.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_fg42.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/fg42.bmp",
+      "assetId": "apop_fg42",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:11",
+      "weaponId": 11,
+      "name": "FG42S",
+      "enName": "FG42S",
+      "age": 0,
+      "category": "돌격소총",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_fg42s.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_fg42S.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/fg42_scope.bmp",
+      "assetId": "apop_fg42s",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:12",
+      "weaponId": 12,
+      "name": "STG44",
+      "enName": "STG44",
+      "age": 0,
+      "category": "돌격소총",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_stg44.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_STG44.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/stg44.bmp",
+      "assetId": "apop_stg44",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:13",
+      "weaponId": 13,
+      "name": "PPsh41",
+      "enName": "PPsh41",
+      "age": 0,
+      "category": "기관단총",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_pp1.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_ppsh41.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/ppsh41.bmp",
+      "assetId": "apeo_pp1",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:14",
+      "weaponId": 14,
+      "name": "PPS43",
+      "enName": "PPS43",
+      "age": 0,
+      "category": "기관단총",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_pp3.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_ppsh43.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/ppsh43.bmp",
+      "assetId": "apeo_pp3",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:15",
+      "weaponId": 15,
+      "name": "Tommy Gun (M1928A1)",
+      "enName": "M1928A1",
+      "age": 0,
+      "category": "기관단총",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_m19a.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_M19A1.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/m19a1.bmp",
+      "assetId": "apeo_m19a",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:16",
+      "weaponId": 16,
+      "name": "MG34",
+      "enName": "MG34",
+      "age": 0,
+      "category": "기관총",
+      "thumbnail": "Data/MENU/Shop/wimage/apom_mg3.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_mg34.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/mg34.bmp",
+      "assetId": "apom_mg3",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:17",
+      "weaponId": 17,
+      "name": "데그챠레프 DP",
+      "enName": "Degtyarev DP",
+      "age": 0,
+      "category": "기관총",
+      "thumbnail": "Data/MENU/Shop/wimage/apep_dpd.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_dpd.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/dp.bmp",
+      "assetId": "apep_dpd",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:18",
+      "weaponId": 18,
+      "name": "수류탄",
+      "enName": "Grenade",
+      "age": 0,
+      "category": "수류탄",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_han.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_hand.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/handgrate.bmp",
+      "assetId": "apop_han",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:19",
+      "weaponId": 19,
+      "name": "RGD 수류탄",
+      "enName": "RGD Grenade",
+      "age": 0,
+      "category": "수류탄",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_rgd.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_rgd.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/granade.bmp",
+      "assetId": "apeo_rgd",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:20",
+      "weaponId": 20,
+      "name": "화염방사기",
+      "enName": "Flamethrower",
+      "age": 0,
+      "category": "화염방사기",
+      "thumbnail": "Data/MENU/Shop/wimage/apob_fir.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_flammenwerfer.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/flammer.bmp",
+      "assetId": "apob_fir",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:21",
+      "weaponId": 21,
+      "name": "판져파우스트",
+      "enName": "Panzerfaust",
+      "age": 0,
+      "category": "로켓",
+      "thumbnail": "Data/MENU/Shop/wimage/apom_paz.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_panzer.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/panzer.bmp",
+      "assetId": "apom_paz",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:22",
+      "weaponId": 22,
+      "name": "바주카포",
+      "enName": "Bazooka",
+      "age": 0,
+      "category": "로켓",
+      "thumbnail": "Data/MENU/Shop/wimage/apeo_m9.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_m9.bmp",
+      "infoImage": null,
+      "assetId": "apeo_m9",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:23",
+      "weaponId": 23,
+      "name": "구급약 (소)",
+      "enName": "Medical Kit Small",
+      "age": 0,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/apom_d1.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_dr1.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/medickit1.bmp",
+      "assetId": "apom_d1",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:24",
+      "weaponId": 24,
+      "name": "구급약 (대)",
+      "enName": "Medical Kit Large",
+      "age": 0,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/apom_d2.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_dr2.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/medickit2.bmp",
+      "assetId": "apom_d2",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:48",
+      "weaponId": 48,
+      "name": "방탄복",
+      "enName": "Armor Vest",
+      "age": 0,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_vest.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_vest.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/protector.bmp",
+      "assetId": "apop_vest",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:49",
+      "weaponId": 49,
+      "name": "헬멧",
+      "enName": "Helmet",
+      "age": 0,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_helmet.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_helmet.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/helmet.bmp",
+      "assetId": "apop_helmet",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "0:50",
+      "weaponId": 50,
+      "name": "쌍안경",
+      "enName": "Binoculars",
+      "age": 0,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/apop_cular.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/p_cular.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/binocular.bmp",
+      "assetId": "apop_cular",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:25",
+      "weaponId": 25,
+      "name": "일렉트릭건",
+      "enName": "Electric Gun",
+      "age": 1,
+      "category": "에너지 무기",
+      "thumbnail": "Data/MENU/Shop/wimage/dfok_eng.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_eng.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/eg.bmp",
+      "assetId": "dfok_eng",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:26",
+      "weaponId": 26,
+      "name": "R-40 카리브건",
+      "enName": "R-40",
+      "age": 1,
+      "category": "소총",
+      "thumbnail": "Data/MENU/Shop/wimage/afop_r400.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_r400.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/r40.bmp",
+      "assetId": "afop_r400",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:27",
+      "weaponId": 27,
+      "name": "R-48 네오카리브건",
+      "enName": "R-48",
+      "age": 1,
+      "category": "소총",
+      "thumbnail": "Data/MENU/Shop/wimage/afop_r480.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_r480.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/r48.bmp",
+      "assetId": "afop_r480",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:28",
+      "weaponId": 28,
+      "name": "SG-22 스톰서지건",
+      "enName": "SG-22",
+      "age": 1,
+      "category": "산탄총",
+      "thumbnail": "Data/MENU/Shop/wimage/afop_sg22.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_sg22.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/sg22.bmp",
+      "assetId": "afop_sg22",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:29",
+      "weaponId": 29,
+      "name": "SG-05 크랙커건",
+      "enName": "SG-05",
+      "age": 1,
+      "category": "산탄총",
+      "thumbnail": "Data/MENU/Shop/wimage/afeo_sg05.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_sg05.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/sg05.bmp",
+      "assetId": "afeo_sg05",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:30",
+      "weaponId": 30,
+      "name": "SG-38 캐터펄트건",
+      "enName": "SG-38",
+      "age": 1,
+      "category": "산탄총",
+      "thumbnail": "Data/MENU/Shop/wimage/afeo_sg38.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_sg38.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/sg38.bmp",
+      "assetId": "afeo_sg38",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:31",
+      "weaponId": 31,
+      "name": "SN-34 샌드맨",
+      "enName": "SN-34",
+      "age": 1,
+      "category": "저격소총",
+      "thumbnail": "Data/MENU/Shop/wimage/afos_sn34.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_sn34.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/sn34.bmp",
+      "assetId": "afos_sn34",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:32",
+      "weaponId": 32,
+      "name": "SN-39 슬리핑드러그",
+      "enName": "SN-39",
+      "age": 1,
+      "category": "저격소총",
+      "thumbnail": "Data/MENU/Shop/wimage/afos_sn39.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_sn39.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/sn39.bmp",
+      "assetId": "afos_sn39",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:33",
+      "weaponId": 33,
+      "name": "PMG-032 울프라이더",
+      "enName": "PMG-032",
+      "age": 1,
+      "category": "기관총",
+      "thumbnail": "Data/MENU/Shop/wimage/afom_pmg0.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_pmg032.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/pmg032.bmp",
+      "assetId": "afom_pmg0",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:34",
+      "weaponId": 34,
+      "name": "SR-42 베어캣",
+      "enName": "SR-42",
+      "age": 1,
+      "category": "소총",
+      "thumbnail": "Data/MENU/Shop/wimage/afer_sr42.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_sr42.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/sr42.bmp",
+      "assetId": "afer_sr42",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:35",
+      "weaponId": 35,
+      "name": "MCG-058 스팀히터",
+      "enName": "MCG-058",
+      "age": 1,
+      "category": "기관총",
+      "thumbnail": "Data/MENU/Shop/wimage/afpm_mcg058.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_mcg058.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/mcgchain.bmp",
+      "assetId": "afpm_mcg058",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:36",
+      "weaponId": 36,
+      "name": "PMG-028 글럼인스펙터",
+      "enName": "PMG-028",
+      "age": 1,
+      "category": "기관총",
+      "thumbnail": "Data/MENU/Shop/wimage/afom_pmg028.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_pmg028.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/pmg028.bmp",
+      "assetId": "afom_pmg028",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:37",
+      "weaponId": 37,
+      "name": "MRM-066 자기부상지뢰",
+      "enName": "MRM-066",
+      "age": 1,
+      "category": "지뢰",
+      "thumbnail": "Data/MENU/Shop/wimage/afob_min.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_mrm066.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/mrm.bmp",
+      "assetId": "afob_min",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:38",
+      "weaponId": 38,
+      "name": "IHG-020 수류탄",
+      "enName": "IHG-020",
+      "age": 1,
+      "category": "수류탄",
+      "thumbnail": "Data/MENU/Shop/wimage/afpb_gren.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_ihg020.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/ihg.bmp",
+      "assetId": "afpb_gren",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:39",
+      "weaponId": 39,
+      "name": "EIRG-110 로켓",
+      "enName": "EIRG-110",
+      "age": 1,
+      "category": "로켓",
+      "thumbnail": "Data/MENU/Shop/wimage/afpm_eirg.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_eirg110.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/eirg110.bmp",
+      "assetId": "afpm_eirg",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:40",
+      "weaponId": 40,
+      "name": "LFG-045 에피센터",
+      "enName": "LFG-045",
+      "age": 1,
+      "category": "중화기",
+      "thumbnail": "Data/MENU/Shop/wimage/afom_lfg045.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_lfg045.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/lfg.bmp",
+      "assetId": "afom_lfg045",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:41",
+      "weaponId": 41,
+      "name": "구급약 MK1",
+      "enName": "MK1",
+      "age": 1,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/dfop_mk1.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_mk1.bmp",
+      "infoImage": null,
+      "assetId": "dfop_mk1",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:48",
+      "weaponId": 48,
+      "name": "방탄복",
+      "enName": "Armor Vest",
+      "age": 1,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/dfop_vest.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_vest.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/protector.bmp",
+      "assetId": "dfop_vest",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:49",
+      "weaponId": 49,
+      "name": "헬멧",
+      "enName": "Helmet",
+      "age": 1,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/afop_helmet.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_helmet.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/helmet.bmp",
+      "assetId": "afop_helmet",
+      "description": "",
+      "source": "weapon-native"
+    },
+    {
+      "id": "1:51",
+      "weaponId": 51,
+      "name": "야간 투시경",
+      "enName": "Night Vision",
+      "age": 1,
+      "category": "장비",
+      "thumbnail": "Data/MENU/Shop/wimage/dfop_cular.jpg",
+      "hudThumbnail": "Data/MENU/Inf/bweapon/f_cular.bmp",
+      "infoImage": "Data/MENU/Shop/WeaponText/nightvision.bmp",
+      "assetId": "dfop_cular",
+      "description": "",
+      "source": "weapon-native"
+    }
+  ],
+  "sources": [
+    {
+      "id": "maplist",
+      "path": "Data/World/fsd.kst!MapList.dat",
+      "sha256": "f2abfb7c010d09f1068213a29d19bd5d57eb49627104843f172ef21deae33318",
+      "notes": "MapList.dat CP949; launch indices are order filtered by age and mode."
+    },
+    {
+      "id": "character-native",
+      "path": "Karma.exe / Data/MENU/Shop/charInfo/*.bmp / Data/Image/photo_character/*",
+      "notes": "Character indices mapped by native function 0x41f9a0 (age/camp/index; 10 each). Korean names transcribed from shipped charInfo BMPs. Portrait aliases follow native photo table order."
+    },
+    {
+      "id": "weapon-native",
+      "path": "Karma.exe / Data/MENU/Shop/wimage / Data/MENU/Inf/bweapon / Data/MENU/Shop/WeaponText",
+      "notes": "Item IDs and image names decoded from 0x486390 HUD constructor, stack ID/name arrays at0x78/0x83c past and0x48/0xbc future. Korean weapon names use native kill-message strings0x537a00..0x537cd0 and shipped item art. Categories describe weapon type."
+    },
+    {
+      "id": "web-context",
+      "url": "https://www.namu.moe/w/%EC%B9%B4%EB%A5%B4%EB%A7%88%20%EC%98%A8%EB%9D%BC%EC%9D%B8",
+      "notes": "Secondary research cross-check only; character names vary by version. Catalog names/art taken from shipped version290 instead."
+    }
+  ],
+  "limitations": [
+    "Catalog mappings are static; parent launcher verifies selected runtime combinations. No internet thumbnails downloaded; all pictures are original shipped game assets."
+  ],
+  "loadout": {
+    "memoryOffset": "0x12e",
+    "length": 7,
+    "pastDefaults": [
+      50,
+      9,
+      6,
+      10,
+      48,
+      24,
+      18
+    ],
+    "futureDefaults": [
+      null,
+      25,
+      35,
+      34,
+      49,
+      48,
+      51
+    ],
+    "source": "Karma.exe0x4205dc..0x420632",
+    "notes": "Future first slot is not written by the offline setup branch. None is an unknown/unset field, not a weapon ID. Slot restrictions and replacement behavior require runtime validation."
+  }
+}

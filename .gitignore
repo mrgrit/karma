@@ -1,0 +1,14 @@
+client/Runtime/
+client/App_Executables/
+client/Launcher/*profile.json
+client/Launcher/*selection.json
+client/Launcher/playstyle.json
+client/Launcher/lan-config-*.json
+client/Launcher/lan-status.json
+client/Launcher/lan-cancel.json
+client/Launcher/pause-*.json
+*.log
+*.zip
+tests/generated-messages.json
+node_modules/
+__pycache__/

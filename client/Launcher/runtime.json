@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "sha256": "ac2f4a79bcdd6cdcae31110104ab4e693a0516dfda6a4aa8abb2cf6ccc1da487",
+  "offsets": {
+    "local": 1396744,
+    "mode": 1396754,
+    "matchType": 1396764,
+    "age": 1396774,
+    "map": 1396784,
+    "character": 1396794,
+    "camp": 1396804
+  },
+  "nodePath": "Runtime/node.exe",
+  "fridaModule": "Runtime/node_modules/frida/build/src/frida.js",
+  "aiReady": true
+}
