@@ -217,14 +217,17 @@ namespace KarmaLocal {
     TextBox search;
     FlowLayoutPanel grid;
     Label heading, count, summary, status, selection, characterName, characterCamp, weaponInfo, rankInfo;
+    Label myName,myRank,myXp,myResults,myMatches,myKd,myRatio,myWinrate,mySync;
     PictureBox portrait;
-    Button start, loadoutButton, accountButton;
+    Button start, loadoutButton, accountButton, refreshStats;
     Button[] tabs;
     TableLayoutPanel contentLayout;
     System.Windows.Forms.Timer watcher;
     Process sessionHelper;
     LobbyWindow lobby;
     bool sessionActive, sessionObservedGame, sessionLan, configuringLan, lobbyLeaving;
+    bool refreshingStats,profileLoginRequired;
+    string profileSyncMessage="저장된 기록 · 서버 확인 전";
     volatile bool closingLauncher;
     string lanDetails="";
     DateTime sessionStartedUtc;
@@ -252,7 +255,7 @@ namespace KarmaLocal {
       initializing=false; SelectDefaults(); RefreshCards();
       watcher=new System.Windows.Forms.Timer{Interval=1200};
       watcher.Tick+=(s,e)=>UpdateRunning(); watcher.Start();
-      Shown+=(s,e)=>FitWorkingArea();
+      Shown+=async(s,e)=>{FitWorkingArea();await SyncMyStats();};
       FormClosing+=(s,e)=>{closingLauncher=true;};
       FormClosed+=(s,e)=>{watcher.Stop();if(sessionActive&&sessionLan)CancelLan();SavePreferences();if(sessionHelper!=null)sessionHelper.Dispose();foreach(Image i in images.Values)i.Dispose();};
     }
@@ -270,9 +273,10 @@ namespace KarmaLocal {
       b.FlatAppearance.BorderColor=Color.FromArgb(60,74,83); owner.Controls.Add(b);return b;
     }
     void Build() {
-      TableLayoutPanel frame=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=Padding.Empty,Padding=Padding.Empty};
+      TableLayoutPanel frame=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Margin=Padding.Empty,Padding=Padding.Empty};
       frame.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
       frame.RowStyles.Add(new RowStyle(SizeType.Absolute,88));
+      frame.RowStyles.Add(new RowStyle(SizeType.Absolute,106));
       frame.RowStyles.Add(new RowStyle(SizeType.Percent,100));
       frame.RowStyles.Add(new RowStyle(SizeType.Absolute,96));
       Controls.Add(frame);
@@ -282,12 +286,23 @@ namespace KarmaLocal {
       LabelAt(header,"전장을 고르고, 바로 시작하세요.",30,55,500,24,10,muted);
       accountButton=ButtonAt(header,"로그인 / 계정",0,22,190,38);accountButton.AutoEllipsis=true;
       accountButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;
-      header.Resize+=(s,e)=>{accountButton.Left=header.ClientSize.Width-accountButton.Width-24;};
+      refreshStats=ButtonAt(header,"전적 새로고침",0,22,140,38);refreshStats.Anchor=AnchorStyles.Top|AnchorStyles.Right;
+      header.Resize+=(s,e)=>{accountButton.Left=header.ClientSize.Width-accountButton.Width-24;refreshStats.Left=accountButton.Left-refreshStats.Width-12;};
       accountButton.Left=header.ClientSize.Width-accountButton.Width-24;
+      refreshStats.Left=accountButton.Left-refreshStats.Width-12;
       accountButton.Click+=async(s,e)=>await ManageAccount();
+      refreshStats.Click+=async(s,e)=>await SyncMyStats();
       UpdateAccountCaption();
+      var stats=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty,Padding=new Padding(24,6,24,10),BackColor=Color.FromArgb(21,29,35)};
+      foreach(float width in new float[]{25,29,23,23})stats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,width));
+      stats.RowStyles.Add(new RowStyle(SizeType.Percent,100));frame.Controls.Add(stats,0,1);
+      var personnel=StatsCard(stats,0,"내 전적",out myRank,out myXp);myName=personnel;
+      StatsCard(stats,1,"승 / 패 / 무",out myResults,out myMatches);
+      StatsCard(stats,2,"킬 / 데스",out myKd,out myRatio);
+      StatsCard(stats,3,"승률",out myWinrate,out mySync);
+      UpdateMyStats();
       Panel footer=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty,BackColor=Color.FromArgb(23,31,37),Padding=new Padding(20)};
-      frame.Controls.Add(footer,0,2);
+      frame.Controls.Add(footer,0,3);
       start=ButtonAt(footer,"게임 시작  →",0,18,200,54);
       start.Anchor=AnchorStyles.Top|AnchorStyles.Right; start.BackColor=accent; start.ForeColor=Color.FromArgb(25,28,26);
       start.Font=new Font("Malgun Gothic",12,FontStyle.Bold); start.FlatAppearance.BorderSize=0; start.Click+=(s,e)=>Launch();
@@ -297,7 +312,7 @@ namespace KarmaLocal {
       start.Left=ClientSize.Width-224;
       TableLayoutPanel body=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=Padding.Empty,Padding=Padding.Empty};
       body.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,234));body.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-      body.RowStyles.Add(new RowStyle(SizeType.Percent,100));frame.Controls.Add(body,0,1);
+      body.RowStyles.Add(new RowStyle(SizeType.Percent,100));frame.Controls.Add(body,0,2);
       Panel sidebar=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty,AutoScroll=true,AutoScrollMinSize=new Size(0,792),BackColor=Color.FromArgb(21,28,34)};
       body.Controls.Add(sidebar,0,0);
       LabelAt(sidebar,"플레이 방식",20,22,194,22,10,muted,true);
@@ -316,7 +331,7 @@ namespace KarmaLocal {
       characterCamp=LabelAt(sidebar,"",20,489,194,30,9,muted);
       loadoutButton=ButtonAt(sidebar,"장비 · 계급",20,530,194,38);
       loadoutButton.Click+=(s,e)=>{
-        if(configuringLan||sessionActive||GameRunning())return;
+        if(refreshingStats||configuringLan||sessionActive||GameRunning())return;
         try{ChooseLoadout();}catch(Exception ex){MessageBox.Show(this,ex.Message,"장비 설정",MessageBoxButtons.OK,MessageBoxIcon.Information);}
       };
       rankInfo=LabelAt(sidebar,"",20,580,194,48,9,accent);
@@ -344,6 +359,15 @@ namespace KarmaLocal {
       contentLayout.Controls.Add(weaponInfo,0,2);
       grid=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,AutoScroll=true,WrapContents=true,Padding=new Padding(0,4,0,10),BackColor=BackColor};
       contentLayout.Controls.Add(grid,0,1);
+    }
+    Label StatsCard(TableLayoutPanel owner,int column,string caption,out Label value,out Label detail){
+      var card=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(12,6,10,4),Margin=new Padding(4,0,4,0),BackColor=Color.FromArgb(30,40,48)};
+      card.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+      card.RowStyles.Add(new RowStyle(SizeType.Absolute,22));card.RowStyles.Add(new RowStyle(SizeType.Percent,100));card.RowStyles.Add(new RowStyle(SizeType.Absolute,22));
+      var title=new Label{Text=caption,Dock=DockStyle.Fill,AutoEllipsis=true,ForeColor=muted,Margin=Padding.Empty};
+      value=new Label{Text="—",Dock=DockStyle.Fill,AutoEllipsis=true,Font=new Font("Malgun Gothic",16,FontStyle.Bold),ForeColor=ink,Margin=Padding.Empty};
+      detail=new Label{Dock=DockStyle.Fill,AutoEllipsis=true,Font=new Font("Malgun Gothic",8),ForeColor=accent,Margin=Padding.Empty};
+      card.Controls.Add(title,0,0);card.Controls.Add(value,0,1);card.Controls.Add(detail,0,2);owner.Controls.Add(card,column,0);return title;
     }
     void FitWorkingArea() {
       Rectangle area=Screen.FromControl(this).WorkingArea;
@@ -459,10 +483,13 @@ namespace KarmaLocal {
       RefreshCentralProfile();UpdateRankInfo();
       if(WindowState==FormWindowState.Minimized)WindowState=restoreState;
       Show();Activate();
+      if(!closingLauncher)BeginInvoke(new Action(async()=>await SyncMyStats()));
       if(sessionError!="")MessageBox.Show(this,sessionError,"게임 실행 오류",MessageBoxButtons.OK,MessageBoxIcon.Information);
     }
     void UpdateRunning() {
       if(start==null)return;
+      if(refreshStats!=null)refreshStats.Enabled=!refreshingStats&&!configuringLan&&!sessionActive&&!GameRunning();
+      if(refreshingStats){start.Enabled=false;start.Text="전적 확인 중";accountButton.Enabled=false;loadoutButton.Enabled=false;return;}
       if(configuringLan){
         start.Enabled=false;start.Text="서버 확인 중";loadoutButton.Enabled=false;accountButton.Enabled=false;modes.Enabled=false;eras.Enabled=false;return;
       }
@@ -515,9 +542,46 @@ namespace KarmaLocal {
     }
     void RefreshCentralProfile() {
       var cached=ReadSupportJson("central-profile.json");
-      cachedProfile=JsonDict(cached,"profile")??cached;
+      cachedProfile=profileLoginRequired?null:JsonDict(cached,"profile")??cached;
       profileXp=Math.Max(0,JsonNumber(cachedProfile,"xp",0));
       UpdateAccountCaption();
+      UpdateMyStats();
+    }
+    void UpdateMyStats(){
+      if(myName==null)return;
+      object value;bool known=cachedProfile!=null&&cachedProfile.TryGetValue("playerId",out value)&&!String.IsNullOrEmpty(Convert.ToString(value));
+      if(!known){
+        myName.Text="내 전적";myRank.Text="로그인 필요";myXp.Text="오른쪽 위 로그인 / 계정";
+        myResults.Text="— / — / —";myMatches.Text="누적 전적";myKd.Text="— / —";myRatio.Text="K/D —";myWinrate.Text="—";mySync.Text=profileSyncMessage;return;
+      }
+      string name=cachedProfile.TryGetValue("name",out value)?Convert.ToString(value):"플레이어";
+      string rank="훈련병";int threshold=-1;object rankValues;
+      if(loadoutData!=null&&loadoutData.TryGetValue("ranks",out rankValues)&&rankValues is IEnumerable)foreach(var entry in (IEnumerable)rankValues){
+        var item=entry as Dictionary<string,object>;int min=JsonNumber(item,"minXp",-1);
+        if(min>=0&&min<=profileXp&&min>threshold){threshold=min;if(item.TryGetValue("name",out value))rank=Convert.ToString(value);}
+      }
+      int wins=Math.Max(0,JsonNumber(cachedProfile,"wins",0)),losses=Math.Max(0,JsonNumber(cachedProfile,"losses",0)),draws=Math.Max(0,JsonNumber(cachedProfile,"draws",0));
+      int kills=Math.Max(0,JsonNumber(cachedProfile,"kills",0)),deaths=Math.Max(0,JsonNumber(cachedProfile,"deaths",0));
+      long matches=(long)wins+losses+draws;
+      myName.Text="내 전적 · "+name;myRank.Text=rank;myXp.Text="XP "+profileXp.ToString("N0");
+      myResults.Text=wins.ToString("N0")+" / "+losses.ToString("N0")+" / "+draws.ToString("N0");
+      myMatches.Text="총 "+matches.ToString("N0")+"경기 · 종료된 경기 기준";
+      myKd.Text=kills.ToString("N0")+" / "+deaths.ToString("N0");
+      myRatio.Text="K/D "+(deaths>0?((double)kills/deaths).ToString("0.00"):kills>0?"무사망":"0.00");
+      myWinrate.Text=(matches>0?100.0*wins/matches:0).ToString("0.0")+"%";mySync.Text=profileSyncMessage;
+    }
+    async Task SyncMyStats(){
+      if(closingLauncher||IsDisposed||refreshingStats||configuringLan||sessionActive||GameRunning())return;
+      refreshingStats=true;profileSyncMessage="서버 기록 확인 중…";UpdateMyStats();UpdateRunning();
+      try{
+        var selected=ReadSupportJson("server-selection.json");object stored;IPAddress address;
+        string host=selected!=null&&selected.TryGetValue("host",out stored)?Convert.ToString(stored):"192.168.12.100";
+        if(!IPAddress.TryParse(host,out address)||address.AddressFamily!=AddressFamily.InterNetwork||address.Equals(IPAddress.Any)||address.Equals(IPAddress.Broadcast))host="192.168.12.100";
+        int port=JsonNumber(selected,"port",29020);if(port<1||port>65534)port=29020;
+        await RefreshServerProfile(host,port,true);
+      }catch(AccountRequiredException){cachedProfile=null;profileXp=0;profileSyncMessage="로그인하면 전적이 표시됩니다.";}
+      catch{profileSyncMessage=cachedProfile==null?"서버 연결 확인 필요":"저장된 기록 · 서버 연결 확인 필요";}
+      finally{refreshingStats=false;if(!closingLauncher&&!IsDisposed){UpdateAccountCaption();UpdateRankInfo();UpdateMyStats();UpdateRunning();}}
     }
     void UpdateAccountCaption() {
       if(accountButton==null)return;
@@ -565,13 +629,12 @@ namespace KarmaLocal {
     sealed class AccountRequiredException : InvalidOperationException {
       public AccountRequiredException(string message):base(message){}
     }
-    async Task RefreshServerProfile(string host,int port) {
+    async Task RefreshServerProfile(string host,int port,bool quiet=false) {
       string cli=Path.Combine(support,"central-profile.mjs");
       if(!File.Exists(cli))throw new FileNotFoundException("서버 계급 확인 도구가 없습니다.",cli);
       string node=NodePath();
       DateTime requested=DateTime.UtcNow;
-      status.Text="중앙 서버에서 계급과 장비 예산을 확인하고 있습니다…";
-      UseWaitCursor=true;grid.Enabled=false;
+      if(!quiet){status.Text="중앙 서버에서 계급과 장비 예산을 확인하고 있습니다…";UseWaitCursor=true;grid.Enabled=false;}
       string failure="";
       try{
         failure=await Task.Run(()=>{
@@ -608,15 +671,18 @@ namespace KarmaLocal {
           }
         });
       } finally{
-        if(!IsDisposed&&!closingLauncher){UseWaitCursor=false;grid.Enabled=true;}
+        if(!quiet&&!IsDisposed&&!closingLauncher){UseWaitCursor=false;grid.Enabled=true;}
       }
       if(closingLauncher||IsDisposed)return;
       if(failure!=""){
         if(failure.IndexOf("AUTH_REQUIRED",StringComparison.Ordinal)>=0||
           failure.IndexOf("AUTH_EXPIRED",StringComparison.Ordinal)>=0||
           failure.IndexOf("SESSION_EXPIRED",StringComparison.Ordinal)>=0||
-          failure.IndexOf("TOKEN_EXPIRED",StringComparison.Ordinal)>=0)
+          failure.IndexOf("TOKEN_EXPIRED",StringComparison.Ordinal)>=0){
+          profileLoginRequired=true;profileSyncMessage="로그인하면 전적이 표시됩니다.";
+          RefreshCentralProfile();UpdateRankInfo();
           throw new AccountRequiredException("중앙 서버에 로그인해 주세요.");
+        }
         throw new InvalidOperationException(failure);
       }
       string cache=Path.Combine(support,"central-profile.json");
@@ -624,6 +690,7 @@ namespace KarmaLocal {
       var profile=JsonDict(cached,"profile")??cached;
       if(JsonNumber(profile,"xp",-1)<0||!File.Exists(cache)||File.GetLastWriteTimeUtc(cache)<requested.AddSeconds(-1))
         throw new InvalidDataException("서버의 최신 계급 기록을 받지 못했습니다. 다시 연결해 주세요.");
+      profileLoginRequired=false;profileSyncMessage=DateTime.Now.ToString("HH:mm")+" 서버 기록 갱신";
       RefreshCentralProfile();UpdateRankInfo();
     }
     async Task<bool> EnsureCentralAccount(string host,int port) {
@@ -638,7 +705,7 @@ namespace KarmaLocal {
       return !closingLauncher&&!IsDisposed;
     }
     async Task ManageAccount() {
-      if(configuringLan||sessionActive||GameRunning())return;
+      if(refreshingStats||configuringLan||sessionActive||GameRunning())return;
       configuringLan=true;UpdateRunning();
       try{
         var selected=ReadSupportJson("server-selection.json");
@@ -655,7 +722,7 @@ namespace KarmaLocal {
           if(!loginRequired)account.ShowAccount(cachedProfile);
           if(account.ShowDialog(this)==DialogResult.OK){
             if(account.Authenticated)await RefreshServerProfile(host,port);
-            else {RefreshCentralProfile();UpdateRankInfo();}
+            else {profileLoginRequired=true;profileSyncMessage="로그인하면 전적이 표시됩니다.";RefreshCentralProfile();UpdateRankInfo();}
           }
         }
       }catch(Exception ex){if(!closingLauncher&&!IsDisposed)
@@ -701,7 +768,7 @@ namespace KarmaLocal {
       Buffer.BlockCopy(BitConverter.GetBytes(value),0,bytes,offset,4);
     }
     async void Launch() {
-      if(configuringLan)return;
+      if(refreshingStats||configuringLan)return;
       if(sessionActive&&sessionLan&&!sessionObservedGame){CancelLan();return;}
       if(GameRunning()||sessionActive){UpdateRunning();return;}
       try {
