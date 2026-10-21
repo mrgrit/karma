@@ -5,6 +5,7 @@ import {spawn as spawnHelper} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createLanPeer} from './lan-transport.mjs';
 import {createCentralPeer} from './central-transport.mjs';
+import {startCoinHud} from './coin-hud.mjs';
 const support=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(support,'..'),game=path.join(root,'App_Executables');
 const readJson=file=>JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
@@ -12,6 +13,7 @@ const settingsPath=path.resolve(process.argv[2]||'');
 if(path.dirname(settingsPath).toLowerCase()!==support.toLowerCase()||
    !/^lan-config-[a-z0-9-]+\.json$/i.test(path.basename(settingsPath)))throw Error('Invalid LAN configuration path');
 const options=readJson(settingsPath),runtime=readJson(path.join(support,'runtime.json'));
+const multiplayerMaps=readJson(path.join(support,'multiplayer-maps.json')).maps;
 const statusPath=path.join(support,'lan-status.json'),cancelPath=path.join(support,'lan-cancel.json');
 const startPath=path.join(support,'lan-start.json');
 const logPath=path.join(support,'last-session.log');
@@ -21,7 +23,7 @@ try{fs.unlinkSync(startPath);}catch{}
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
 const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
 let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,connected=false,
-  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer;
+  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud;
 const checkClosing=()=>{if(closing)throw Error('LAN 대전이 취소되었습니다.');};
 const cleanMenu=()=>{
   clearInterval(pauseTimer);pauseTimer=null;
@@ -81,9 +83,10 @@ try{
   if(!['host','join'].includes(options.role)||!/^\d{6}$/.test(String(options.code)))throw Error('LAN 역할 또는 6자리 방 코드를 확인해 주세요.');
   const localCharacter=characterConfig(options.config?.character);
   const central=options.transport==='central';
-  let config={map:0,age:0,character:localCharacter,
+  let config={map:central?(options.config?.map??0):0,age:0,character:localCharacter,
     ...(central?{inventory:options.config.inventory,selectedWeapon:options.config.selectedWeapon}:{}),
-    settings:{build:central?'karma290-central3':'karma290-lan1',mode:1}};
+    settings:{build:central?'karma290-central4':'karma290-lan1',mode:1}};
+  if(!multiplayerMaps.some(map=>map.mapIndex===config.map))throw Error('멀티플레이 지원 전장을 선택하세요.');
   status('connecting',options.role==='host'?'방을 준비하고 있습니다.':'방에 접속하고 있습니다.');
   peer=await (central?createCentralPeer:createLanPeer)({
     role:options.role,host:options.host,port:options.port||29020,code:String(options.code),config,
@@ -96,7 +99,7 @@ try{
         (detail.manualStart?(detail.isHost?'방장이 시작 버튼을 누르면 출전합니다.':'방장이 시작하기를 기다립니다.'):'정원이 모이면 자동 시작합니다.'),
         {roomId:detail.roomId,code:detail.code||options.code,players:detail.players||1,maxPlayers:detail.maxPlayers||options.maxPlayers||2,
           mode:detail.mode||options.matchMode,hostId:detail.hostId,isHost:detail.isHost??(options.role==='host'),manualStart:detail.manualStart===true,
-          canStart:detail.canStart===true,startReason:detail.startReason||'',members:detail.members||[]});
+          canStart:detail.canStart===true,startReason:detail.startReason||'',members:detail.members||[],gameFee:detail.gameFee||0});
       if(phase==='round-ended')status('playing','라운드 '+detail.round+' 종료 · '+detail.roundWins.join(' : ')+' · 다음 라운드 준비');
       if(phase==='round-start')status('playing','라운드 '+detail.round+' · 한 팀 전멸 시 종료 · F10 메뉴');
       if(phase==='match-ended'){
@@ -131,13 +134,13 @@ try{
   const remoteHello=await peer.ready;
   checkClosing();connected=true;
   if(central)config=peer.effectiveConfig;
-  if(remoteHello.config.map!==0||remoteHello.config.age!==0||
+  if(remoteHello.config.map!==config.map||remoteHello.config.age!==0||!multiplayerMaps.some(map=>map.mapIndex===config.map)||
      remoteHello.config.settings?.build!==config.settings.build)throw Error('서로 같은 LAN 수정본과 전장을 사용해야 합니다.');
   const remoteCharacter=characterConfig(remoteHello.config.character);
   status('loading','상대 연결 완료 · 게임을 불러오고 있습니다.');
   const template=fs.readFileSync(path.join(support,'session-template.bin'));
   if(crypto.createHash('sha256').update(template).digest('hex')!==runtime.sha256)throw Error('게임 템플릿을 확인할 수 없습니다.');
-  const values={local:1,mode:1,matchType:1,age:0,map:0,character:localCharacter.index,camp:localCharacter.camp};
+  const values={local:1,mode:1,matchType:1,age:0,map:config.map,character:localCharacter.index,camp:localCharacter.camp};
   for(const [key,value] of Object.entries(values))template.writeInt32LE(value,runtime.offsets[key]);
   const exe=path.join(game,'KarmaSession.exe');fs.writeFileSync(exe,template);
   const bundled=path.join(root,'Runtime/node_modules/frida/build/src/frida.js');
@@ -169,7 +172,7 @@ try{
     if(payload.event==='offline-player-death')status('playing',peer.match?.mode==='tdm'?'전사 · 팀전은 다음 라운드에 다시 등장합니다.':peer.match?.mode==='dm'?'전사 · 10초 후 랜덤 위치에서 다시 등장합니다.':'전사 · 잠시 후 다시 등장합니다.');
     if(payload.event==='lan-local-respawn')status('playing','재등장 · Tab 점수판 · F10 메뉴 · Esc 종료');
     if(payload.kind==='exit-requested')stop('LAN 대전을 종료했습니다.');
-    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료');}
+    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);if(!closeCoinHud)closeCoinHud=startCoinHud({root,pid,host:options.host,port:options.port,log});status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료');}
     if(payload.kind==='pause-requested')openMenu(payload);
   });
   const done=new Promise(resolve=>session.detached.connect((reason,crash)=>{
@@ -191,5 +194,6 @@ try{
   if(!wasClosing)process.exitCode=1;
 }finally{
   clearTimeout(startupTimer);clearTimeout(validationTimer);clearInterval(keepAlive);cleanMenu();
+  closeCoinHud?.();
   try{fs.unlinkSync(settingsPath);}catch{}
 }

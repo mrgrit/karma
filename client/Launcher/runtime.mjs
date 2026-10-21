@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {spawn as spawnHelper} from 'node:child_process';
 import {fileURLToPath,pathToFileURL} from 'node:url';
+import {startCoinHud} from './coin-hud.mjs';
 const support=path.dirname(fileURLToPath(import.meta.url));
 const game=path.resolve(support,'../App_Executables');
 const config=JSON.parse(fs.readFileSync(path.join(support,'runtime.json'),'utf8').replace(/^\uFEFF/,''));
@@ -11,7 +12,7 @@ const ai=process.argv.includes('--ai');
 const logPath=path.join(support,'last-session.log');
 fs.writeFileSync(logPath,'');
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
-let device,pid,session,pauseHelper,pausePoll,pauseCommand,startupTimer,validationTimer;
+let device,pid,session,pauseHelper,pausePoll,pauseCommand,startupTimer,validationTimer,closeCoinHud;
 const cleanPause=()=>{
   if(pausePoll){clearInterval(pausePoll);pausePoll=null;}
   if(pauseHelper){try{pauseHelper.kill();}catch{}pauseHelper=null;}
@@ -86,7 +87,7 @@ try {
   script.message.connect(message=>{
     if(message.type==='send'){
       log('agent',message.payload);
-      if(message.payload.event==='game-frame-ready'){clearTimeout(startupTimer);startupTimer=null;}
+      if(message.payload.event==='game-frame-ready'){clearTimeout(startupTimer);startupTimer=null;if(!closeCoinHud)closeCoinHud=startCoinHud({root:path.resolve(support,'..'),pid,log});}
       if(message.payload.kind==='pause-requested')openPause(message.payload);
       if(message.payload.event==='playstyle-profile'&&message.payload.profile){
         const numeric=Object.fromEntries(Object.entries(message.payload.profile).filter(([key,value])=>key.length<40&&typeof value==='number'&&Number.isFinite(value)));
@@ -101,7 +102,7 @@ try {
   });
   const ended=new Promise(resolve=>session.detached.connect((reason,crash)=>{
     clearTimeout(startupTimer);clearTimeout(validationTimer);
-    cleanPause();log('game-ended',{reason,crash:crash?String(crash):null});resolve();
+    cleanPause();closeCoinHud?.();log('game-ended',{reason,crash:crash?String(crash):null});resolve();
   }));
   await script.load();
   const compatibility=await script.exports.compatibilitystatus();
@@ -112,6 +113,7 @@ try {
   process.exit(0);
 } catch(error) {
   clearTimeout(startupTimer);clearTimeout(validationTimer);
+  closeCoinHud?.();
   cleanPause();
   log('launch-error',{message:String(error)});
   if(device&&pid)try{await device.kill(pid);}catch{}

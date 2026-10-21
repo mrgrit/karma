@@ -90,6 +90,13 @@ namespace KarmaLocal {
         if(emptyId!=255)throw new InvalidDataException("빈 장비 항목 값이 올바르지 않습니다.");
         LoadWeapons();
         LoadBudget();
+        int unlockXp=Number(characterData,"unlockXp",0);
+        if(userXp<unlockXp){
+          BuildUnavailable(character.Name+" · "+RankAt(unlockXp)+"부터 선택 가능",
+            "현재 "+RankName+" · XP "+userXp.ToString("N0")+" / 필요 XP "+unlockXp.ToString("N0")+
+            "\n"+TextOf(characterData,"roleName")+" 병과입니다. 전적을 쌓으면 이 캐릭터가 해금됩니다.");
+          return;
+        }
         Build(character);
         Restore(saved);
       } catch(Exception ex) {
@@ -127,6 +134,13 @@ namespace KarmaLocal {
           NumberStyles.Integer,CultureInfo.InvariantCulture,out n)?n:-1;
       }).ToArray();
     }
+    string RankAt(int xp){
+      var rank=ArrayOf(data,"ranks").OfType<Dictionary<string,object>>()
+        .Where(r=>Number(r,"minXp",-1)>=0&&Number(r,"minXp",-1)<=xp)
+        .OrderBy(r=>Number(r,"minXp",0)).LastOrDefault();
+      return TextOf(rank,"name","필요 계급");
+    }
+    int DefaultStartingWeapon(){return Number(characterData,"defaultSelectedWeapon",Number(data,"defaultSelectedWeapon",9));}
 
     void LoadWeapons() {
       foreach(var entry in ArrayOf(data,"weapons")) {
@@ -186,6 +200,12 @@ namespace KarmaLocal {
         "  ·  최대 "+Budget.ToString("N0")+"점  (캐릭터 "+originalCapacity.ToString("N0")+
         " + 계급 "+rankBonus.ToString("N0")+")",10,accent,true));
       header.Controls.Add(Wrapped(RoleDescription(TextOf(characterData,"role")),9,muted));
+      var dual=Dict(Dict(data,"constraints"),"dualCannon");
+      if(dual!=null&&TextOf(characterData,"role")==TextOf(dual,"role","heavy")){
+        int needed=Number(dual,"minXp",600);
+        header.Controls.Add(Wrapped("쌍포 · "+RankAt(needed)+" (XP "+needed.ToString("N0")+")부터: "+
+          "판져파우스트 + 바주카포. 가벼운 자동화기 1정과 쌍안경만 추가할 수 있습니다.",9,accent));
+      }
       frame.Controls.Add(header,0,0);
 
       scroller=new Panel{Dock=DockStyle.Fill,AutoScroll=true,Margin=Padding.Empty,
@@ -197,6 +217,8 @@ namespace KarmaLocal {
       scroller.Controls.Add(scrollContent);
       scroller.ClientSizeChanged+=(s,e)=>SizeScrollContent();
       var permissions=Dict(characterData,"allowedIdsBySlot");
+      var optionalSlots=new HashSet<string>(ArrayOf(characterData,"optionalSlots").Select(v=>Convert.ToString(v)));
+      int[] defaultsByCharacter=IntArray(characterData,"defaultInventory");
       var slotData=ArrayOf(data,"slots").OfType<Dictionary<string,object>>()
         .OrderBy(s=>Number(s,"index",-1)).ToArray();
       if(slotData.Length!=7)throw new InvalidDataException("출전 장비는 7칸이어야 합니다.");
@@ -207,11 +229,14 @@ namespace KarmaLocal {
         var all=new HashSet<int>(IntArray(s,"allowedIds"));
         int[] permitted=permissions!=null&&permissions.ContainsKey(key)?IntArray(permissions,key):all.ToArray();
         var allowed=new HashSet<int>(permitted.Where(id=>all.Contains(id)&&weapons.ContainsKey(id)));
-        bool optional=Flag(s,"optional");if(optional)allowed.Add(emptyId);
-        int defaultId=Number(s,"defaultId",-1);
+        if(key=="pistol"&&dual!=null&&userXp<Number(dual,"minXp",600))
+          allowed.ExceptWith(IntArray(dual,"cannonIds"));
+        bool optional=Flag(s,"optional")||optionalSlots.Contains(key);if(optional)allowed.Add(emptyId);
+        int defaultId=defaultsByCharacter.Length==7?defaultsByCharacter[i]:Number(s,"defaultId",-1);
         if(allowed.Count==0||!allowed.Contains(defaultId))
           throw new InvalidDataException(TextOf(s,"name")+"의 기본 장비가 허용 목록에 없습니다.");
-        var row=new SlotRow{Index=i,Key=key,Name=TextOf(s,"name"),DefaultId=defaultId,
+        string slotName=key=="pistol"&&TextOf(characterData,"role")!="heavy"?"보조무기":TextOf(s,"name");
+        var row=new SlotRow{Index=i,Key=key,Name=slotName,DefaultId=defaultId,
           Optional=optional,Allowed=allowed};
         rows.Add(row);
         BuildRow(row);
@@ -248,6 +273,13 @@ namespace KarmaLocal {
       var cancel=MakeButton("취소");cancel.DialogResult=DialogResult.Cancel;
       var defaults=MakeButton("기본 장비");
       buttons.Controls.Add(apply);buttons.Controls.Add(cancel);buttons.Controls.Add(defaults);
+      if(dual!=null&&TextOf(characterData,"role")==TextOf(dual,"role","heavy")){
+        int needed=Number(dual,"minXp",600);
+        var twin=MakeButton(userXp>=needed?"쌍포 구성":"쌍포 · "+RankAt(needed)+"부터");
+        twin.Enabled=userXp>=needed;buttons.Controls.Add(twin);
+        tips.SetToolTip(twin,"두 포와 가벼운 자동화기로 구성하고, 방어·회복·수류탄과 권총을 비웁니다.");
+        twin.Click+=(s,e)=>ApplyDualPreset(dual);
+      }
       footer.Controls.Add(buttons);frame.Controls.Add(footer,0,2);
       AcceptButton=apply;CancelButton=cancel;
       apply.Click+=(s,e)=>{ValidateSelection();if(apply.Enabled){DialogResult=DialogResult.OK;Close();}};
@@ -278,7 +310,7 @@ namespace KarmaLocal {
       row.Cost=new Label{Text="",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleRight,ForeColor=accent};
       line.Controls.Add(row.Cost,3,0);scrollContent.Controls.Add(line);
       tips.SetToolTip(row.Cost,"원본 상점 필요능력치");
-      row.Picker.SelectedIndexChanged+=(s,e)=>{if(!updating)RefreshSelection();};
+      row.Picker.SelectedIndexChanged+=(s,e)=>{if(!updating){restoredNotice="";RefreshSelection();}};
     }
     static string Signed(string value) {
       double number;
@@ -286,13 +318,16 @@ namespace KarmaLocal {
       return number>0?"+"+value:value;
     }
     static string RoleDescription(string role) {
+      if(role=="assault")return "돌격 · 자동소총·기관단총으로 전선을 밀고, 유탄·수류탄과 보조 장비를 활용합니다.";
+      if(role=="sniper")return "저격 · 저격소총을 중심으로 먼 거리를 맡습니다. 자동화기·로켓포는 사용할 수 없습니다.";
+      if(role=="heavy")return "중화기 · 기관총·화염방사기·로켓포를 운용합니다. 기관총과 유탄·로켓포는 함께 들 수 없습니다.";
       if(role=="scout")return "기동형 · 가벼운 소총·기관단총과 석궁을 사용할 수 있습니다.";
       if(role=="support")return "지원형 · 기관총·중화기를 사용할 수 있습니다. 기관총과 유탄·로켓 조합은 제한됩니다.";
       return "균형형 · 소총·기관단총·저격총을 사용할 수 있습니다.";
     }
     void Restore(Dictionary<string,object> saved) {
       int[] inventory=IntArray(saved,"inventory");
-      int selected=Number(saved,"selectedWeapon",Number(data,"defaultSelectedWeapon",9));
+      int selected=Number(saved,"selectedWeapon",DefaultStartingWeapon());
       bool repaired=saved!=null&&inventory.Length!=7;
       updating=true;
       for(int i=0;i<rows.Count;i++) {
@@ -303,7 +338,24 @@ namespace KarmaLocal {
       }
       updating=false;
       SelectedWeapon=selected;
-      if(repaired)restoredNotice="현재 캐릭터가 사용할 수 없는 저장 장비를 기본값으로 바꿨습니다.";
+      RefreshSelection();
+      if(saved!=null&&(repaired||!apply.Enabled)){
+        updating=true;
+        foreach(var row in rows)row.Picker.SelectedItem=weapons[row.DefaultId];
+        updating=false;SelectedWeapon=DefaultStartingWeapon();
+        restoredNotice="저장 장비가 현재 병과·계급 규칙에 맞지 않아 기본 장비로 바꿨습니다.";
+        RefreshSelection();
+      }
+    }
+    void ApplyDualPreset(Dictionary<string,object> dual){
+      var cannonIds=IntArray(dual,"cannonIds");
+      var preset=IntArray(dual,"defaultInventory");
+      if(cannonIds.Length!=2||preset.Length!=7||userXp<Number(dual,"minXp",600))return;
+      if(rows.Any(row=>!row.Allowed.Contains(preset[row.Index])))return;
+      updating=true;
+      foreach(var row in rows)row.Picker.SelectedItem=weapons[preset[row.Index]];
+      updating=false;SelectedWeapon=Number(dual,"defaultSelectedWeapon",cannonIds[0]);
+      restoredNotice="쌍포 구성: 방어·회복·수류탄과 권총을 비웠습니다. 주무기도 ‘장착 안 함’으로 비울 수 있습니다.";
       RefreshSelection();
     }
     void RefreshSelection() {
@@ -355,12 +407,27 @@ namespace KarmaLocal {
         problems.Add("같은 장비를 두 칸에 장착할 수 없습니다.");
       var heavy=Dict(Dict(data,"constraints"),"heavyCombination");
       if(heavy!=null) {
-        var primary=rows.FirstOrDefault(r=>r.Key=="primary");
-        var special=rows.FirstOrDefault(r=>r.Key=="special");
-        if(primary!=null&&special!=null &&
-          IntArray(heavy,"primaryIds").Contains(Inventory[primary.Index]) &&
-          IntArray(heavy,"specialIds").Contains(Inventory[special.Index]))
+        if(IntArray(heavy,"primaryIds").Any(id=>Inventory.Contains(id)) &&
+          IntArray(heavy,"specialIds").Any(id=>Inventory.Contains(id)))
           problems.Add("기관총과 유탄·로켓 특수무기는 함께 장착할 수 없습니다.");
+      }
+      var dual=Dict(Dict(data,"constraints"),"dualCannon");
+      if(dual!=null){
+        var cannons=new HashSet<int>(IntArray(dual,"cannonIds"));
+        int cannonCount=Inventory.Count(id=>cannons.Contains(id));
+        var auxiliary=rows.FirstOrDefault(row=>row.Key=="pistol");
+        if(auxiliary!=null&&cannons.Contains(Inventory[auxiliary.Index])&&cannonCount!=2)
+          problems.Add("보조포 슬롯은 쌍포 전용입니다. 특수무기에도 다른 로켓포를 장착하거나 보조포를 비워 주세요.");
+        if(cannonCount>1){
+          int requiredXp=Number(dual,"minXp",600);
+          if(TextOf(characterData,"role")!=TextOf(dual,"role","heavy")||userXp<requiredXp)
+            problems.Add("쌍포는 중화기 병과 "+RankAt(requiredXp)+" (XP "+requiredXp.ToString("N0")+")부터 사용할 수 있습니다.");
+          if(cannonCount>Number(dual,"maxCannons",2))problems.Add("로켓포는 최대 두 개까지 장착할 수 있습니다.");
+          var light=new HashSet<int>(IntArray(dual,"lightAutomaticIds"));
+          var utilities=new HashSet<int>(IntArray(dual,"utilityIds"));
+          if(Inventory.Count(id=>light.Contains(id))>1||Inventory.Any(id=>id!=emptyId&&!cannons.Contains(id)&&!light.Contains(id)&&!utilities.Contains(id)))
+            problems.Add("쌍포 구성에는 가벼운 자동화기 1정과 쌍안경만 추가할 수 있습니다. 권총·방어·회복·수류탄은 비워 주세요.");
+        }
       }
       if(Cost>Budget)problems.Add("예산을 "+(Cost-Budget).ToString("N0")+"점 초과했습니다. 장비를 바꾸거나 선택 슬롯을 비워 주세요.");
       WeaponChoice start;

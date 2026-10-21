@@ -33,7 +33,7 @@ namespace KarmaLocal {
       AutoScaleMode=AutoScaleMode.Dpi;StartPosition=FormStartPosition.CenterScreen;
       MaximizeBox=false;MinimizeBox=false;TopMost=true;KeyPreview=true;
       BackColor=Color.FromArgb(21,29,35);ForeColor=Color.White;Font=new Font("Malgun Gothic",11);
-      Controls.Add(new Label{Text=lan?"LAN 메뉴 · 대전은 계속됩니다.\n마우스를 자유롭게 사용할 수 있습니다.":"일시 정지\n마우스를 자유롭게 사용할 수 있습니다.",Location=new Point(24,22),Size=new Size(362,70)});
+      Controls.Add(new Label{Text=(lan?"LAN 메뉴 · 대전은 계속됩니다.":"일시 정지")+"\n내 코인   "+CoinHud.ReadBalance(),Location=new Point(24,22),Size=new Size(362,70)});
       Button resume=new Button{Text="계속  (F10)",Location=new Point(24,115),Size=new Size(170,48)};
       Button exit=new Button{Text="게임 종료  (Esc)",Location=new Point(210,115),Size=new Size(176,48)};
       var matchStatus=new Label{Location=new Point(24,91),Size=new Size(362,80),ForeColor=Color.FromArgb(223,184,105)};
@@ -171,7 +171,7 @@ namespace KarmaLocal {
         members.BeginUpdate();members.Items.Clear();members.Items.AddRange(lines.Cast<object>().ToArray());members.EndUpdate();
       }
       begin.Text=host?"대전 시작 →":"방장 시작 대기";begin.Enabled=host&&manual&&Flag(data,"canStart");
-      info.Text=Read(data,"message")+(host&&!Flag(data,"canStart")?"\n"+Read(data,"startReason"):"");
+      info.Text=Read(data,"message")+(host&&!Flag(data,"canStart")?"\n"+Read(data,"startReason"):"")+(Read(data,"gameFee")=="100"?"\n대전 시작 시 1인당 1 KARMA · 대기실 입장은 무료":"");
     }
     public void Dismiss(){dismissing=true;Close();}
   }
@@ -188,13 +188,13 @@ namespace KarmaLocal {
     public CatalogItem Item;
     public bool Selected;
     public Action<Tile> Pick;
-    public Tile(CatalogItem item,Image image,string subtitle,bool portrait) {
+    public Tile(CatalogItem item,Image image,string subtitle,bool portrait,bool locked=false) {
       Item=item; Width=190; Height=portrait?244:184; Margin=new Padding(7);
       BackColor=Color.FromArgb(30,37,42); Cursor=Cursors.Hand;
       PictureBox pic=new PictureBox {Image=image,SizeMode=PictureBoxSizeMode.Zoom,
         Location=new Point(9,9),Size=new Size(172,portrait?168:108),BackColor=Color.FromArgb(20,25,29)};
-      Label title=new Label {Text=item.Name,Location=new Point(12,portrait?184:125),Size=new Size(166,23),
-        Font=new Font("Malgun Gothic",10,FontStyle.Bold),ForeColor=Color.FromArgb(238,237,226),AutoEllipsis=true};
+      Label title=new Label {Text=(locked?"잠금 · ":"")+item.Name,Location=new Point(12,portrait?184:125),Size=new Size(166,23),
+        Font=new Font("Malgun Gothic",10,FontStyle.Bold),ForeColor=locked?Color.FromArgb(151,165,170):Color.FromArgb(238,237,226),AutoEllipsis=true};
       Label sub=new Label {Text=subtitle,Location=new Point(12,portrait?211:151),Size=new Size(166,20),
         Font=new Font("Malgun Gothic",8),ForeColor=Color.FromArgb(151,165,170),AutoEllipsis=true};
       Controls.Add(pic); Controls.Add(title); Controls.Add(sub);
@@ -207,7 +207,7 @@ namespace KarmaLocal {
   public class Launcher : Form {
     readonly string root, game, support;
     readonly JavaScriptSerializer json=new JavaScriptSerializer();
-    Dictionary<string,object> catalog, runtime, loadoutData, cachedProfile;
+    Dictionary<string,object> catalog, runtime, loadoutData, cachedProfile,multiplayerMaps;
     List<CatalogItem> maps,characters,weapons;
     readonly Dictionary<string,Image> images=new Dictionary<string,Image>(StringComparer.OrdinalIgnoreCase);
     CatalogItem map,character,weapon;
@@ -241,6 +241,7 @@ namespace KarmaLocal {
       catalog=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(support,"catalog.json"),Encoding.UTF8));
       runtime=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(support,"runtime.json"),Encoding.UTF8));
       loadoutData=ReadSupportJson("loadouts.json");
+      multiplayerMaps=ReadSupportJson("multiplayer-maps.json");
       RefreshCentralProfile();
       maps=Items("maps"); characters=Items("characters"); weapons=Items("weapons");
       Text="카르마 · 로컬 플레이"; ClientSize=new Size(1160,810); MinimumSize=new Size(1020,720);
@@ -287,8 +288,12 @@ namespace KarmaLocal {
       accountButton=ButtonAt(header,"로그인 / 계정",0,22,190,38);accountButton.AutoEllipsis=true;
       accountButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;
       refreshStats=ButtonAt(header,"전적 새로고침",0,22,140,38);refreshStats.Anchor=AnchorStyles.Top|AnchorStyles.Right;
+      var walletButton=ButtonAt(header,"지갑 · 거래소 ↗",0,63,190,22);walletButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;walletButton.Font=new Font("Malgun Gothic",8);
+      walletButton.Click+=(s,e)=>{try{Process.Start(new ProcessStartInfo("https://exchange.ycdc.internal"){UseShellExecute=true});}catch(Exception ex){MessageBox.Show(this,"거래소를 열지 못했습니다.\n"+ex.Message);}};
+      header.Resize+=(s,e)=>walletButton.Left=header.ClientSize.Width-walletButton.Width-24;
       header.Resize+=(s,e)=>{accountButton.Left=header.ClientSize.Width-accountButton.Width-24;refreshStats.Left=accountButton.Left-refreshStats.Width-12;};
       accountButton.Left=header.ClientSize.Width-accountButton.Width-24;
+      walletButton.Left=accountButton.Left;
       refreshStats.Left=accountButton.Left-refreshStats.Width-12;
       accountButton.Click+=async(s,e)=>await ManageAccount();
       refreshStats.Click+=async(s,e)=>await SyncMyStats();
@@ -385,20 +390,36 @@ namespace KarmaLocal {
     int GameMode { get {return modes.SelectedIndex==1?4:modes.SelectedIndex==2?5:1;} }
     bool AiReady { get {object v;return runtime.TryGetValue("aiReady",out v)&&Convert.ToBoolean(v);} }
     bool LanMode { get {return modes.SelectedIndex>=4;} }
+    bool IsAdmin { get {object value;return !profileLoginRequired&&cachedProfile!=null&&cachedProfile.TryGetValue("isAdmin",out value)&&value is bool&&(bool)value;} }
+    Dictionary<string,object> MultiplayerMap(CatalogItem item){
+      object entries;if(item==null||multiplayerMaps==null||!multiplayerMaps.TryGetValue("maps",out entries)||!(entries is IEnumerable))return null;
+      foreach(var entry in (IEnumerable)entries){var data=entry as Dictionary<string,object>;object id;if(data!=null&&data.TryGetValue("id",out id)&&Convert.ToString(id)==item.Id)return data;}return null;
+    }
+    bool PublicMap(CatalogItem item){var data=MultiplayerMap(item);object ready;return data!=null&&data.TryGetValue("publicReady",out ready)&&ready is bool&&(bool)ready;}
+    Dictionary<string,object> CharacterDefinition(CatalogItem item){return item==null?null:JsonDict(JsonDict(loadoutData,"characters"),item.Id);}
+    bool CharacterUnlocked(CatalogItem item){return item!=null&&(item.Age!=0?IsAdmin:CharacterDefinition(item)!=null&&profileXp>=JsonNumber(CharacterDefinition(item),"unlockXp",0));}
+    string CharacterRole(CatalogItem item){var data=CharacterDefinition(item);object value;return data!=null&&data.TryGetValue("roleName",out value)?Convert.ToString(value):CampName(item);}
+    string CharacterUnlockText(CatalogItem item){
+      var data=CharacterDefinition(item);int required=JsonNumber(data,"unlockXp",0);string rank="훈련병";object entries,value;
+      if(loadoutData!=null&&loadoutData.TryGetValue("ranks",out entries)&&entries is IEnumerable)foreach(var entry in (IEnumerable)entries){var r=entry as Dictionary<string,object>;if(JsonNumber(r,"minXp",-1)==required&&r.TryGetValue("name",out value))rank=Convert.ToString(value);}
+      return rank+" · XP "+required.ToString("N0");
+    }
     int MapIndex(CatalogItem item) {
       if(item==null)return -1;
       var d=item.Dict("launchIndices");object v;
       int index=-1;
       if(d!=null&&d.TryGetValue(age+":"+GameMode,out v))index=Convert.ToInt32(v);
       else if(d!=null&&d.TryGetValue(GameMode.ToString(),out v))index=Convert.ToInt32(v);
-      if(modes.SelectedIndex>=3&&(age!=0||index!=0))return -1;
+      if(!IsAdmin&&!PublicMap(item))return -1;
+      if(modes.SelectedIndex==3&&(age!=0||index!=0))return -1;
+      if(LanMode&&(age!=0||MultiplayerMap(item)==null))return -1;
       return index;
     }
     void SelectDefaults() {
       if(modes.SelectedIndex>=3){age=0;eras.SelectedIndex=0;}
       eras.Enabled=modes.SelectedIndex<3;
       if(map==null||map.Age!=age||MapIndex(map)<0)map=maps.FirstOrDefault(x=>x.Age==age&&MapIndex(x)>=0);
-      if(character==null||character.Age!=age)character=characters.FirstOrDefault(x=>x.Age==age&&x.Number("characterIndex",-1)>=0);
+      if(character==null||character.Age!=age||!CharacterUnlocked(character))character=characters.FirstOrDefault(x=>x.Age==age&&x.Number("characterIndex",-1)>=0&&CharacterUnlocked(x));
     }
     Image Picture(CatalogItem item) {
       if(item==null)return null;string rel=item.Read("thumbnail");
@@ -413,18 +434,19 @@ namespace KarmaLocal {
       grid.SuspendLayout();foreach(Control c in grid.Controls.Cast<Control>().ToArray())c.Dispose();grid.Controls.Clear();
       foreach(Button b in tabs){b.BackColor=Color.FromArgb(34,44,51);b.ForeColor=ink;}
       tabs[tab].BackColor=accent;tabs[tab].ForeColor=Color.FromArgb(25,28,26);
-      IEnumerable<CatalogItem> list=tab==0?maps.Where(x=>x.Age==age&&MapIndex(x)>=0):tab==1?characters.Where(x=>x.Age==age&&x.Number("characterIndex",-1)>=0):weapons.Where(x=>x.Age==age);
-      string q=search.Text.Trim();if(q!="")list=list.Where(x=>(x.Name+" "+x.Id+" "+x.Read("assetId")).IndexOf(q,StringComparison.OrdinalIgnoreCase)>=0);
+      IEnumerable<CatalogItem> list=tab==0?maps.Where(x=>x.Age==age&&MapIndex(x)>=0):tab==1?characters.Where(x=>x.Age==age&&x.Number("characterIndex",-1)>=0).OrderBy(x=>JsonNumber(CharacterDefinition(x),"unlockXp",0)).ThenBy(x=>CharacterRole(x)):weapons.Where(x=>x.Age==age);
+      string q=search.Text.Trim();if(q!="")list=list.Where(x=>(x.Name+" "+x.Id+" "+x.Read("assetId")+(tab==1?" "+CharacterRole(x):"")).IndexOf(q,StringComparison.OrdinalIgnoreCase)>=0);
       List<CatalogItem> shown=list.ToList();
-      count.Text=shown.Count+"개 · 이름으로 검색";
+      count.Text=shown.Count+(tab==1?"명 · 이름 / 돌격 / 저격 / 중화기 검색":"개 · 이름으로 검색");
       heading.Text=tab==0?"ORIGINAL BATTLEFIELDS":tab==1?"CHOOSE YOUR CHARACTER":"ORIGINAL ARSENAL";
       weaponInfo.Visible=tab==2;weaponInfo.Text="게임에 포함된 원본 무기입니다. 이 화면에서는 외형과 이름을 확인할 수 있습니다.";
       contentLayout.RowStyles[2].Height=tab==2?Math.Max(42,weaponInfo.Font.Height*3):0;
       foreach(CatalogItem item in shown) {
-        string sub=tab==0?(age==0?"과거":"미래")+"  ·  "+(GameMode==5?"사격장":GameMode==4?"저격전":"데스매치"):tab==1?CampName(item):item.Read("category");
-        Tile tile=new Tile(item,Picture(item),sub,tab==1);
+        bool locked=tab==1&&!CharacterUnlocked(item);
+        string sub=tab==0?(PublicMap(item)?"멀티플레이 지원":"관리자 · 미검증 전장"):tab==1?CharacterRole(item)+" · "+(locked?CharacterUnlockText(item):"사용 가능"):item.Read("category");
+        Tile tile=new Tile(item,Picture(item),sub,tab==1,locked);
         tile.Selected=item==(tab==0?map:tab==1?character:weapon);
-        tile.Pick=t=>{if(tab==0)map=t.Item;else if(tab==1)character=t.Item;else weapon=t.Item;
+        tile.Pick=t=>{if(tab==1&&!CharacterUnlocked(t.Item)){MessageBox.Show(this,t.Item.Name+" · "+CharacterRole(t.Item)+"\n"+CharacterUnlockText(t.Item)+"부터 선택할 수 있습니다.","캐릭터 해금");return;}if(tab==0)map=t.Item;else if(tab==1)character=t.Item;else weapon=t.Item;
           foreach(Tile card in grid.Controls.OfType<Tile>()){card.Selected=card==t;card.Invalidate();}
           UpdateSummary();SavePreferences();};
         grid.Controls.Add(tile);
@@ -434,7 +456,7 @@ namespace KarmaLocal {
     }
     void UpdateSummary() {
       portrait.Image=Picture(character);characterName.Text=character!=null?character.Name:"캐릭터를 선택하세요";
-      characterCamp.Text=CampName(character);
+      characterCamp.Text=CampName(character)+" · "+CharacterRole(character);
       UpdateRankInfo();
       selection.Text=map!=null?"선택한 전장\n"+map.Name+"\n\nW/A/S/D 이동\n마우스 시점 · 왼쪽 클릭 발사\n"+(LanMode?"F10 메뉴 · Esc 종료":"F10 일시 정지 · Esc 종료"):"전장을 선택하세요.";
       summary.Text=(map!=null?map.Name:"전장 미선택")+"  /  "+(character!=null?character.Name:"캐릭터 미선택");
@@ -517,7 +539,7 @@ namespace KarmaLocal {
       bool ai=modes.SelectedIndex==3;
       start.Enabled=!running&&!sessionActive&&map!=null&&character!=null&&(!ai||AiReady);
       start.Text=running?"게임 실행 중":sessionActive?"게임 시작 중":ai&&!AiReady?"AI 기능 준비 중":LanMode?(modes.SelectedIndex==4?"서버 방 만들기 →":"서버 참가 →"):"게임 시작  →";
-      status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · Mass of Winter":ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
+      status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · "+(modes.SelectedIndex==5?"참가 시 방장의 전장 적용":map!=null?map.Name:""):ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
     }
     void CloseLobby(){if(lobby!=null){var old=lobby;lobby=null;old.Dismiss();}}
     void RequestLanStart(string roomId){
@@ -546,6 +568,7 @@ namespace KarmaLocal {
       profileXp=Math.Max(0,JsonNumber(cachedProfile,"xp",0));
       UpdateAccountCaption();
       UpdateMyStats();
+      if(!initializing&&maps!=null&&modes!=null){SelectDefaults();RefreshCards();}
     }
     void UpdateMyStats(){
       if(myName==null)return;
@@ -564,6 +587,9 @@ namespace KarmaLocal {
       int kills=Math.Max(0,JsonNumber(cachedProfile,"kills",0)),deaths=Math.Max(0,JsonNumber(cachedProfile,"deaths",0));
       long matches=(long)wins+losses+draws;
       myName.Text="내 전적 · "+name;myRank.Text=rank;myXp.Text="XP "+profileXp.ToString("N0");
+      var coins=JsonDict(cachedProfile,"coins");object available;
+      if(coins!=null){bool current=coins.TryGetValue("available",out available)&&available!=null;
+        myXp.Text+="  ·  "+(current?(Convert.ToDecimal(available)/100m).ToString("N2")+" KARMA":"코인 조회 대기");}
       myResults.Text=wins.ToString("N0")+" / "+losses.ToString("N0")+" / "+draws.ToString("N0");
       myMatches.Text="총 "+matches.ToString("N0")+"경기 · 종료된 경기 기준";
       myKd.Text=kills.ToString("N0")+" / "+deaths.ToString("N0");
@@ -614,6 +640,7 @@ namespace KarmaLocal {
     Dictionary<string,object> ChooseLoadout() {
       if(character==null)return null;
       RefreshCentralProfile();UpdateRankInfo();
+      if(!CharacterUnlocked(character))throw new InvalidOperationException("이 캐릭터는 "+CharacterUnlockText(character)+"부터 선택할 수 있습니다.");
       var all=ReadSupportJson("loadout-selection.json")??new Dictionary<string,object>();
       var byCharacter=JsonDict(all,"characters")??new Dictionary<string,object>();
       var saved=JsonDict(byCharacter,character.Id);
@@ -740,12 +767,14 @@ namespace KarmaLocal {
       using(var dialog=new LanSetup(modes.SelectedIndex==4,support)){
         if(dialog.ShowDialog(this)!=DialogResult.OK)return;
         if(!await EnsureCentralAccount(dialog.Host,dialog.Port))return;
+        if(map==null||MapIndex(map)<0)throw new InvalidOperationException("멀티플레이 지원 전장을 선택하세요.");
         var loadout=ChooseLoadout();
         if(loadout==null)return;
         string configPath=Path.Combine(support,"lan-config-"+Guid.NewGuid().ToString("N")+".json");
         var options=new Dictionary<string,object>{
           {"transport","central"},{"role",modes.SelectedIndex==4?"host":"join"},{"host",dialog.Host},{"port",dialog.Port},{"code",dialog.Code},{"maxPlayers",dialog.MaxPlayers},{"matchMode",dialog.MatchMode},
           {"config",new Dictionary<string,object>{
+            {"map",MapIndex(map)},{"age",0},
             {"character",new Dictionary<string,object>{{"id",character.Id},{"index",character.Number("characterIndex",0)},
               {"camp",character.Number("camp",0)},{"name",character.Read("enName")},
               {"model",Path.GetFileName(character.Read("model").Replace('/',Path.DirectorySeparatorChar)).ToLowerInvariant()}}},
@@ -807,10 +836,12 @@ namespace KarmaLocal {
       }catch{}
     }
     [STAThread] public static void Main() {
+      if(Environment.GetCommandLineArgs().Contains("--coin-hud"))CoinHud.InitializeDpi();
       Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
       try{
         string[] args=Environment.GetCommandLineArgs();
-        if((args.Length==5||args.Length==6)&&args[1]=="--pause")Application.Run(new PauseWindow(args[2],args[3],Int32.Parse(args[4]),args.Contains("--lan")));
+        if(args.Length==4&&args[1]=="--coin-hud")Application.Run(new CoinHud(Int32.Parse(args[2]),Int32.Parse(args[3])));
+        else if((args.Length==5||args.Length==6)&&args[1]=="--pause")Application.Run(new PauseWindow(args[2],args[3],Int32.Parse(args[4]),args.Contains("--lan")));
         else Application.Run(new Launcher());
       }catch(Exception e){MessageBox.Show(e.Message,"카르마 로컬 실행",MessageBoxButtons.OK,MessageBoxIcon.Error);}
     }

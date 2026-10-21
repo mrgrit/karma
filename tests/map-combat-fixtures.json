@@ -1,0 +1,190 @@
+[
+  {
+    "mapIndex": 7,
+    "sectorCount": 9,
+    "testPair": [
+      {
+        "sectorName": "5",
+        "position": [
+          4340,
+          300,
+          -12778
+        ],
+        "yawDegrees": 270,
+        "nativeSectorIndex": 4
+      },
+      {
+        "sectorName": "5",
+        "position": [
+          3405,
+          300,
+          -12778
+        ],
+        "yawDegrees": 270,
+        "nativeSectorIndex": 4
+      }
+    ],
+    "sixDistant": [
+      {
+        "sectorName": "9",
+        "position": [
+          6372,
+          300,
+          -985
+        ],
+        "yawDegrees": 90,
+        "nativeSectorIndex": 6,
+        "distanceFromPair": 11966.782065
+      },
+      {
+        "sectorName": "3",
+        "position": [
+          1827,
+          600,
+          -3659
+        ],
+        "yawDegrees": 90,
+        "nativeSectorIndex": 2,
+        "distanceFromPair": 9259.386859
+      },
+      {
+        "sectorName": "7",
+        "position": [
+          10181,
+          -149.999996,
+          -6954
+        ],
+        "yawDegrees": 180,
+        "nativeSectorIndex": 7,
+        "distanceFromPair": 8260.675335
+      },
+      {
+        "sectorName": "6",
+        "position": [
+          8206,
+          600,
+          -5573
+        ],
+        "yawDegrees": 180,
+        "nativeSectorIndex": 5,
+        "distanceFromPair": 8182.174589
+      },
+      {
+        "sectorName": "6",
+        "position": [
+          7758,
+          1600,
+          -9816
+        ],
+        "yawDegrees": 270,
+        "nativeSectorIndex": 5,
+        "distanceFromPair": 4705.971526
+      },
+      {
+        "sectorName": "5",
+        "position": [
+          -149,
+          1600,
+          -10071
+        ],
+        "yawDegrees": 0,
+        "nativeSectorIndex": 4,
+        "distanceFromPair": 4652.823336
+      }
+    ]
+  },
+  {
+    "mapIndex": 4,
+    "sectorCount": 1,
+    "testPair": [
+      {
+        "sectorName": "1",
+        "position": [
+          -10962,
+          0,
+          -5880
+        ],
+        "yawDegrees": 260,
+        "nativeSectorIndex": 0
+      },
+      {
+        "sectorName": "1",
+        "position": [
+          -11693,
+          0,
+          -5896
+        ],
+        "yawDegrees": 276,
+        "nativeSectorIndex": 0
+      }
+    ],
+    "sixDistant": [
+      {
+        "sectorName": "1",
+        "position": [
+          644,
+          381.044678,
+          13902
+        ],
+        "yawDegrees": 129,
+        "nativeSectorIndex": 0,
+        "distanceFromPair": 22938.438374
+      },
+      {
+        "sectorName": "1",
+        "position": [
+          -1569,
+          1127.319616,
+          8847
+        ],
+        "yawDegrees": 57,
+        "nativeSectorIndex": 0,
+        "distanceFromPair": 17503.823226
+      },
+      {
+        "sectorName": "1",
+        "position": [
+          4457,
+          19.397232,
+          804
+        ],
+        "yawDegrees": 206,
+        "nativeSectorIndex": 0,
+        "distanceFromPair": 16805.409643
+      },
+      {
+        "sectorName": "1",
+        "position": [
+          3391,
+          -119.115768,
+          -467
+        ],
+        "yawDegrees": 251,
+        "nativeSectorIndex": 0,
+        "distanceFromPair": 15340.253145
+      },
+      {
+        "sectorName": "1",
+        "position": [
+          -8682,
+          251.066375,
+          8499
+        ],
+        "yawDegrees": 59,
+        "nativeSectorIndex": 0,
+        "distanceFromPair": 14560.806136
+      },
+      {
+        "sectorName": "1",
+        "position": [
+          -3581,
+          -119.115772,
+          3237
+        ],
+        "yawDegrees": 30,
+        "nativeSectorIndex": 0,
+        "distanceFromPair": 11730.85839
+      }
+    ]
+  }
+]

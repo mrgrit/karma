@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import assert from 'node:assert/strict';
 const source=fs.readFileSync('native/lan_game_core.js','utf8')
+ .replace('/*__MAPS__*/','const mapDefinitions='+JSON.stringify(JSON.parse(fs.readFileSync('client/Launcher/multiplayer-maps.json','utf8')).maps)+';')
  .replace('/*__TEST_DISPATCH__*/','const testNativeShotDispatch=null;')
  .replace('/*__LOADOUT__*/',fs.readFileSync('native/lan_loadout_game.js','utf8'));
 const fixture=[];

@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "originalExecutableSha256": "aa824dda4d48c0304de3e9ab1c6012c542dc280eca93a6d507da9a21c4bbedab",
+  "results": [
+    {
+      "name": "Factory",
+      "mapIndex": 7,
+      "mode": "dm",
+      "dual": false,
+      "passed": true,
+      "completedUtc": "2026-10-21T01:37:48.050Z",
+      "evidence": "tests/native-eight-dm-map7.jsonl",
+      "evidenceSha256": "bcce35bf0fe824e884de7b1cf085e64222f7f6a967dafa72a57a6449c344da0c",
+      "nativePlayers": 8,
+      "remoteActors": 56,
+      "allScoreboardsVerified": true,
+      "checks": [
+        "8 native games",
+        "56 remote actors",
+        "all-pair native position replication",
+        "slot7 targeted combat",
+        "all 8 scoreboards",
+        "server XP",
+        "individual disconnect",
+        "clean exit",
+        "input isolation",
+        "10-second random respawn"
+      ],
+      "respawn": {
+        "time": "2026-10-21T01:37:47.634Z",
+        "event": "dm-ten-second-random-respawn",
+        "passed": true,
+        "elapsedSinceScoreMs": 9894,
+        "position": [
+          -660,
+          600,
+          -12150
+        ]
+      }
+    },
+    {
+      "name": "Factory",
+      "mapIndex": 7,
+      "mode": "tdm",
+      "dual": true,
+      "passed": true,
+      "completedUtc": "2026-10-21T01:57:28.510Z",
+      "evidence": "tests/native-eight-tdm-map7-dual.jsonl",
+      "evidenceSha256": "db79d0205a20d05bf812304b1f670aeff72d3a4fb69ae0f5bb7e1ad62328eabf",
+      "nativePlayers": 8,
+      "remoteActors": 56,
+      "allScoreboardsVerified": true,
+      "checks": [
+        "8 native games",
+        "56 remote actors",
+        "all-pair native position replication",
+        "slot7 targeted combat",
+        "all 8 scoreboards",
+        "server XP",
+        "individual disconnect",
+        "clean exit",
+        "input isolation",
+        "friendly explosive immunity",
+        "no mid-round respawn",
+        "team elimination and opposite-end next-round reset"
+      ],
+      "cannonKills": [
+        {
+          "player": 1,
+          "nativeWeapon": 21
+        },
+        {
+          "player": 3,
+          "nativeWeapon": 22
+        },
+        {
+          "player": 5,
+          "nativeWeapon": 21
+        }
+      ],
+      "roundPositions": [
+        [
+          3405,
+          300,
+          -12778
+        ],
+        [
+          5873,
+          398.0793762207031,
+          -291
+        ],
+        [
+          3381,
+          439.77630615234375,
+          -13901
+        ],
+        [
+          6837,
+          400.978271484375,
+          -272
+        ],
+        [
+          4506.99951171875,
+          426.2772216796875,
+          -13811.9990234375
+        ],
+        [
+          6860,
+          300,
+          -1395
+        ],
+        [
+          4340,
+          300,
+          -12778
+        ],
+        [
+          5910,
+          300,
+          -2101
+        ]
+      ],
+      "friendlyBlastShooterHpBeforeTargetedCombat": 10
+    },
+    {
+      "name": "Rescue",
+      "mapIndex": 4,
+      "mode": "dm",
+      "dual": false,
+      "passed": true,
+      "completedUtc": "2026-10-21T01:58:31.910Z",
+      "evidence": "tests/native-eight-dm-map4.jsonl",
+      "evidenceSha256": "c761aeed4c163a6bf96d6503ca41cdb94e1774a7818498c0852895019446cfb6",
+      "nativePlayers": 8,
+      "remoteActors": 56,
+      "allScoreboardsVerified": true,
+      "checks": [
+        "8 native games",
+        "56 remote actors",
+        "all-pair native position replication",
+        "slot7 targeted combat",
+        "all 8 scoreboards",
+        "server XP",
+        "individual disconnect",
+        "clean exit",
+        "input isolation",
+        "10-second random respawn"
+      ],
+      "respawn": {
+        "time": "2026-10-21T01:58:31.482Z",
+        "event": "dm-ten-second-random-respawn",
+        "passed": true,
+        "elapsedSinceScoreMs": 9910,
+        "position": [
+          -6401,
+          10.044990539550781,
+          397
+        ]
+      }
+    },
+    {
+      "name": "Rescue",
+      "mapIndex": 4,
+      "mode": "tdm",
+      "dual": true,
+      "passed": true,
+      "completedUtc": "2026-10-21T01:59:46.278Z",
+      "evidence": "tests/native-eight-tdm-map4-dual.jsonl",
+      "evidenceSha256": "6e3f02f683958e7e72d30778eb897d33a372feaca34bf7279dbbb142264b5253",
+      "nativePlayers": 8,
+      "remoteActors": 56,
+      "allScoreboardsVerified": true,
+      "checks": [
+        "8 native games",
+        "56 remote actors",
+        "all-pair native position replication",
+        "slot7 targeted combat",
+        "all 8 scoreboards",
+        "server XP",
+        "individual disconnect",
+        "clean exit",
+        "input isolation",
+        "friendly explosive immunity",
+        "no mid-round respawn",
+        "team elimination and opposite-end next-round reset",
+        "both original cannons kill opponents"
+      ],
+      "cannonKills": [
+        {
+          "player": 1,
+          "nativeWeapon": 21
+        },
+        {
+          "player": 3,
+          "nativeWeapon": 22
+        },
+        {
+          "player": 5,
+          "nativeWeapon": 21
+        }
+      ],
+      "roundPositions": [
+        [
+          -11693,
+          0,
+          -5896
+        ],
+        [
+          -1851,
+          -119.11576843261719,
+          3896
+        ],
+        [
+          -12297,
+          0,
+          -5788
+        ],
+        [
+          -1547,
+          -119.11576843261719,
+          3460
+        ],
+        [
+          -12901,
+          0,
+          -5521
+        ],
+        [
+          -3253,
+          -119.11576843261719,
+          2520
+        ],
+        [
+          -10962,
+          0,
+          -5880
+        ],
+        [
+          -2331,
+          -119.11576843261719,
+          4215
+        ]
+      ],
+      "friendlyBlastShooterHpBeforeTargetedCombat": 30
+    },
+    {
+      "name": "MassWinter",
+      "mapIndex": 0,
+      "mode": "tdm",
+      "dual": true,
+      "passed": true,
+      "completedUtc": "2026-10-21T02:01:00.416Z",
+      "evidence": "tests/native-eight-tdm-dual.jsonl",
+      "evidenceSha256": "43da6ec88761e5f5ce1b3f2892689fde86a693144d23e31c3af977e4070bc65c",
+      "nativePlayers": 8,
+      "remoteActors": 56,
+      "allScoreboardsVerified": true,
+      "checks": [
+        "8 native games",
+        "56 remote actors",
+        "all-pair native position replication",
+        "slot7 targeted combat",
+        "all 8 scoreboards",
+        "server XP",
+        "individual disconnect",
+        "clean exit",
+        "input isolation",
+        "friendly explosive immunity",
+        "no mid-round respawn",
+        "team elimination and opposite-end next-round reset",
+        "both original cannons kill opponents"
+      ],
+      "cannonKills": [
+        {
+          "player": 1,
+          "nativeWeapon": 21
+        },
+        {
+          "player": 3,
+          "nativeWeapon": 22
+        },
+        {
+          "player": 5,
+          "nativeWeapon": 21
+        }
+      ],
+      "roundPositions": [
+        [
+          -10717,
+          400,
+          -22174
+        ],
+        [
+          2916,
+          1200,
+          -1252
+        ],
+        [
+          -10133,
+          400,
+          -22298
+        ],
+        [
+          5321,
+          2120,
+          -13
+        ],
+        [
+          -9537,
+          400,
+          -22387
+        ],
+        [
+          4325,
+          2120,
+          896
+        ],
+        [
+          -10306,
+          400,
+          -22556
+        ],
+        [
+          3401,
+          1200,
+          -2473
+        ]
+      ],
+      "friendlyBlastShooterHpBeforeTargetedCombat": 5
+    }
+  ],
+  "testCorrections": [
+    {
+      "issue": "Actor teleport did not orient the native camera; ordinary tick overwrote requested yaw.",
+      "originalEvidence": [
+        "0x450020 respawn calls 0x4061e0(camera,yaw,0,x,y,z)",
+        "0x4061e0 ret0x14 confirms five stack arguments",
+        "0x45034a reads 0x4077e0(camera), which returns camera+0x2e0 yaw, and updates the local actor"
+      ],
+      "correction": "Test-only camera initialization on the game thread after probe actor placement. Production native code unchanged."
+    },
+    {
+      "issue": "Friendly-fire test causes native self-splash and knockback to its shooter before the separate targeted-fire phase.",
+      "correction": "Keep that native damage, capture HP baseline, and require all unrelated players take zero additional targeted-fire damage. Restore test origin after friendly blast knockback."
+    }
+  ],
+  "scope": "Eight isolated original native game processes on one Windows PC, private loopback server, temporary accounts; no desktop input capture.",
+  "limitations": [
+    "This does not measure Internet latency or eight separate physical PCs.",
+    "Public map flags and deployment are managed separately by the parent task.",
+    "Factory DM evidence was produced by the parent before the probe-camera correction; its assertions and retained scoreboards pass."
+  ]
+}

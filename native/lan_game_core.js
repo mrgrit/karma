@@ -50,7 +50,7 @@ if(roster.length<1||roster.length>7)throw Error('Expected 1 to 7 peers');
 const peers=roster.map((peer,i)=>({...peer,index:i+1,id:peer.playerId||cfg.remotePlayerId||'remote',
  team:peer.team??1,r:null,life:0,seq:-1,dead:false,paused:false,left:false,latest:null,shots:new Set(),hits:new Set()}));
 const selfId=cfg.localPlayerId||'local',selfTeam=cfg.team??0,teamMode=cfg.match?.mode==='tdm';
-const authoritative=cfg.central===true&&cfg.local?.settings?.build==='karma290-central3';
+const authoritative=cfg.central===true&&['karma290-central3','karma290-central4'].includes(cfg.local?.settings?.build);
 function peerById(id){return id?peers.find(p=>p.id===id):peers.length===1?peers[0]:null;}
 function peerByIndex(index){return peers.find(p=>p.index===index);}
 function nativeIndex(id){return id===selfId?0:peerById(id)?.index??-1;}
@@ -263,10 +263,11 @@ Interceptor.attach(P(0x420560),{
  }
 });
 const nativeSectorByName=new NativeFunction(P(0x444ac0),'int',['pointer','pointer'],'thiscall');
-const spawns=[['1',[-3846,400,-7446]],['1',[5315,400,-8272]],['1',[5037,400,-16531]],['1',[-5837,400,-18965]],
- ['5',[-3650,1400,-13551]],['6',[-147,1400,-8212]],['2',[-908,400,-8500]],['3',[2192,1200,-1314]]];
-const teamSpawns=[['1',[-10306,400,-22556]],['1',[-10717,400,-22174]],['1',[-10133,400,-22298]],['1',[-9537,400,-22387]],
- ['3',[3401,1200,-2473]],['3',[2916,1200,-1252]],['3',[5321,2120,-13]],['3',[4325,2120,896]]];
+/*__MAPS__*/
+const battlefield=mapDefinitions.find(map=>map.mapIndex===(cfg.local?.map??0));
+if(!battlefield)throw Error('Unsupported multiplayer battlefield');
+const spawns=battlefield.dmSpawns.map(p=>[p.sectorName,p.position,p.yawDegrees]);
+const teamSpawns=battlefield.teamSpawns.map(p=>[p.sectorName,p.position,p.yawDegrees]);
 // A room has a random server UUID. All clients derive the same permutation,
 // so a fresh deathmatch starts at random, non-overlapping spawn positions.
 const initialSpawnOrder=spawns.map((_,i)=>i);
@@ -291,7 +292,7 @@ function spawnFor(m,serial=0){
  lastSpawnIndex=index;
  const point=teamMode?teamSpawns[selfTeam*4+((Math.floor(slot/2)+serial)%4)]:spawns[index];
  const text=Memory.allocUtf8String(point[0]),world=m.add(0xc).readPointer();
- return {sector:nativeSectorByName(world,text),pos:point[1],yaw:teamMode?(selfTeam===0?45:225):0};
+ return {sector:nativeSectorByName(world,text),pos:point[1],yaw:point[2]||0};
 }
 let spawnSerial=0,lastSpawnIndex=cfg.slot??(cfg.role==='join'?1:0);
 globalThis.KARMA_LAN_RESPAWN=(m)=>{

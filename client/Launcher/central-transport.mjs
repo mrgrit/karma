@@ -109,7 +109,7 @@ export async function createCentralPeer({
     if(message.type==='round-start'||message.type==='round-ended'){report({phase:message.type,...message});onMessage({...message,version:1});return;}
     if(message.type==='death-confirmed'||message.type==='proof-rejected'){
       report({phase:message.type,...message});
-      if(message.type==='death-confirmed'&&config.settings?.build==='karma290-central3')onMessage({...message,version:1});
+      if(message.type==='death-confirmed'&&['karma290-central3','karma290-central4'].includes(config.settings?.build))onMessage({...message,version:1});
       return;
     }
     if(INBOUND.has(message.type)){onMessage({...message,version:1});return;}

@@ -4,7 +4,7 @@ $repo = $PSScriptRoot
 $client = Join-Path $repo 'client'
 $source = Join-Path $client 'Launcher'
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-& $compiler /nologo /target:winexe /optimize+ "/out:$client\KarmaLauncher.exe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "$source\KarmaLauncher.cs" "$source\LoadoutDialog.cs" "$source\AuthDialog.cs"
+& $compiler /nologo /target:winexe /optimize+ "/out:$client\KarmaLauncher.exe" /reference:System.Windows.Forms.dll /reference:System.Drawing.dll /reference:System.Web.Extensions.dll "$source\KarmaLauncher.cs" "$source\LoadoutDialog.cs" "$source\AuthDialog.cs" "$source\CoinHud.cs"
 if ($LASTEXITCODE -ne 0) { throw 'C# build failed' }
 if ($GameRoot) {
     $target = (Resolve-Path -LiteralPath $GameRoot).Path
