@@ -24,6 +24,9 @@ const nativeDamage=new NativeFunction(P(0x461ae0),'int',['pointer','int','int','
 const nativePellets=new NativeFunction(P(0x461d50),'int',['pointer','int','int','int','float','float','float','int','int'],'thiscall');
 const nativeSimpleDamage=new NativeFunction(P(0x461e50),'void',['pointer','int','int','int'],'thiscall');
 const nativeReset=new NativeFunction(P(0x45e3a0),'void',['pointer'],'thiscall');
+// Original loader allocates all eight actor objects (44f8bf); configure reuses them.
+const nativeConfigure=new NativeFunction(P(0x44fb30),'int',['pointer','int','int','pointer','int','pointer','pointer','int'],'thiscall');
+const nativeLoadModel=new NativeFunction(P(0x44f960),'int',['pointer','pointer','int','int'],'thiscall');
 const nativeInventory=new NativeFunction(P(0x44fd00),'void',['pointer','int','int','pointer','int'],'thiscall');
 const nativeStance=new NativeFunction(P(0x463dd0),'void',['pointer','int'],'thiscall');
 const nativeBody=new NativeFunction(P(0x463100),'void',['pointer','int'],'thiscall');
@@ -38,7 +41,7 @@ const nativeSort=new NativeFunction(P(0x423980),'void',['pointer'],'thiscall');
 const projectileWeapons=new Set([4,6,18,19,21,22,23,24,37,38]);
 const pelletWeapons=new Set([28,29,30]);
 const st={gm:null,m:null,p:null,r:null,localPlaced:false,placedAt:0,ready:false,firstTick:0,
- life:1,remoteLife:0,seq:0,remoteSeq:-1,remoteDead:false,localDead:false,lastState:0,lastLog:0,
+ life:integer(cfg.match?.initialLife,1,1e9)?cfg.match.initialLife:1,remoteLife:0,seq:0,remoteSeq:-1,remoteDead:false,localDead:false,lastState:0,lastLog:0,
  shotSequence:0,lastShot:null,remoteShotIds:new Set(),hitIds:new Set(),deathIds:new Set(),
  queue:[],latestRemote:null,renderCalls:0,hitHooks:0,sentHits:0,receivedHits:0,remoteShots:0,scoreEvents:0,
  placement:null,testShot:null,testPending:null,testSerial:0,remotePaused:false,closed:false};
@@ -50,13 +53,13 @@ if(roster.length<1||roster.length>7)throw Error('Expected 1 to 7 peers');
 const peers=roster.map((peer,i)=>({...peer,index:i+1,id:peer.playerId||cfg.remotePlayerId||'remote',
  team:peer.team??1,r:null,life:0,seq:-1,dead:false,paused:false,left:false,latest:null,shots:new Set(),hits:new Set()}));
 const selfId=cfg.localPlayerId||'local',selfTeam=cfg.team??0,teamMode=cfg.match?.mode==='tdm';
-const authoritative=cfg.central===true&&['karma290-central3','karma290-central4'].includes(cfg.local?.settings?.build);
+const authoritative=cfg.central===true&&['karma290-central3','karma290-central4','karma290-central5'].includes(cfg.local?.settings?.build);
 function peerById(id){return id?peers.find(p=>p.id===id):peers.length===1?peers[0]:null;}
 function peerByIndex(index){return peers.find(p=>p.index===index);}
 function nativeIndex(id){return id===selfId?0:peerById(id)?.index??-1;}
 function playerId(index){return index===0?selfId:peerByIndex(index)?.id??null;}
 function friendly(peer){return teamMode&&peer?.team===selfTeam;}
-function syncLegacy(){const p=peers[0];st.r=p.r;st.remoteLife=p.life;st.remoteSeq=p.seq;st.remoteDead=p.dead;st.latestRemote=p.latest;st.remotePaused=p.paused;}
+function syncLegacy(){const p=peers.find(p=>!p.left)||peers[0];st.r=p?.r||null;st.remoteLife=p?.life||0;st.remoteSeq=p?.seq??-1;st.remoteDead=p?.dead??true;st.latestRemote=p?.latest||null;st.remotePaused=p?.paused??false;}
 
 /*__LOADOUT__*/
 function emit(message){send({event:'lan-outbound',message:{version:1,life:st.life,seq:++st.seq,...message}});}
@@ -87,10 +90,14 @@ function validate(x){
  if(!x||x.version!==1||typeof x.type!=='string')return false;
  if(x.type==='drop')return validDrop(x.drop);
  if(x.type==='pickup-grant')return validGrant(x.grant);
+ if(x.type==='drop-grant')return validDropGrant(x.grant);
+ if(x.type==='drop-denied')return idValid(x.requestId);
  if(x.type==='drop-removed'||x.type==='pickup-denied')return idValid(x.dropId);
  if(x.type==='pause')return typeof x.paused==='boolean';
  if(x.type==='leave')return true;
  if(x.type==='peer-left')return typeof x.playerId==='string';
+ if(x.type==='peer-joined')return validPeer(x.peer);
+ if(x.type==='match-snapshot')return Array.isArray(x.players)&&x.players.length<=8&&x.players.every(p=>idValid(p.playerId)&&integer(p.kills,0,1e6)&&integer(p.deaths,0,65535))&&integer(x.remainingSeconds,0,86400);
  if(x.type==='round-start')return integer(x.round,1,1000)&&x.lives&&integer(x.lives[selfId],1,1e9);
  if(x.type==='round-ended')return integer(x.round,1,1000);
  if(x.type==='death-confirmed')return x.receipt&&typeof x.receipt.victimId==='string'&&integer(x.receipt.victimLife,1,1e9);
@@ -103,9 +110,9 @@ function validate(x){
   (x.armorPierce===undefined||integer(x.armorPierce,0,1));
  return false;
 }
-function scores(){return st.gm?Array.from({length:peers.length+1},(_,slot)=>({slot,kills:st.gm.add(0x1458+slot*16).readS32(),deaths:st.gm.add(0x1460+slot*16).readU16()})):null;}
+function scores(){return st.gm?Array.from({length:Math.max(0,...peers.map(p=>p.index))+1},(_,slot)=>({slot,playerId:playerId(slot),active:slot===0||!peerByIndex(slot)?.left,kills:st.gm.add(0x1458+slot*16).readS32(),deaths:st.gm.add(0x1460+slot*16).readU16()})):null;}
 function countDeath(victim,life,killer,weapon){
- const key=victim+':'+life;
+ const key=playerId(victim)+':'+life;
  if(!boundedRemember(st.deathIds,key)||!st.gm)return;
  const attacker=Number.isInteger(killer)?killer:killer==='remote'?1-victim:-1,backend=st.m.add(0x104c).readPointer();
  if(attacker>=0&&!backend.isNull()){
@@ -136,6 +143,7 @@ function localPose(){
   stance:p.add(0x1970).readU8(),body:p.add(0x1971).readU8(),weaponAnim:p.add(0x1972).readU8(),
   eyeHeight:finite(height,1000)&&height>=30?height:300,paused:globalThis.KARMA_LOCAL_INPUT_PAUSED===true,
   inventory:[...(loot.inventory||[])],selectedWeapon:p.add(0x290).readU8(),
+  ammo:(()=>{const r=weaponRecord(p,p.add(0x290).readU8());return r.capacity>0&&r.magazine>=0&&r.reserve>=0?{[r.weapon]:{magazine:r.magazine,reserve:r.reserve}}:{};})(),
   shotSequence:st.shotSequence,...(st.lastShot?{shot:st.lastShot}:{})};
 }
 function sendState(type='state'){if(st.ready){const pose=localPose();if(!validPose(pose))return;
@@ -172,6 +180,7 @@ function activateRemote(message,reset,peer){
 }
 function replayShot(shot,peer){
  if(!shot||shot.life!==peer.life||!safeSector(shot.sector)||!safeSector(shot.renderSector))return;
+ if(Number.isInteger(shot.id)&&shot.id<=(peer.shotFloor||0))return;
  if(!boundedRemember(peer.shots,shot.life+':'+shot.id))return;
  if(shot.weapon>38)return; // Original auxiliary equipment has no combat replay.
  const m=st.m,r=peer.r,index=peer.index;
@@ -191,6 +200,8 @@ function replayShot(shot,peer){
 function receivePose(x,peer){
  if(!safeSector(x.sector)||x.life<peer.life||x.seq<=peer.seq||peer.left)return;
  const first=!peer.latest,newLife=x.life>peer.life;
+ if(newLife)peer.shotFloor=0;
+ if(first&&!x.shot&&integer(x.shotSequence,0,1e9))peer.shotFloor=x.shotSequence;
  peer.seq=x.seq;peer.life=x.life;peer.paused=!!x.paused;
  activateRemote(x,first||newLife||(x.hp>0&&hp(peer.r)<=0),peer);
  peer.latest=x;peer.dead=x.hp<=0;
@@ -208,14 +219,106 @@ function receiveHit(x,peer){
  reportDamage(before,hp(st.p),peer.index,x.weapon,{id:x.id,life:x.life});
  localDeath('remote',x.weapon,peer.id);
 }
+function validPeer(p){
+ return p&&typeof p.playerId==='string'&&p.playerId!==selfId&&integer(p.slot,0,7)&&integer(p.team,0,1)&&
+  p.config&&p.config.map===cfg.local.map&&p.config.age===0&&p.config.settings?.build===cfg.local.settings?.build&&
+  /^[a-z0-9_.-]{1,15}\.chr$/i.test(p.config.character?.model||'')&&
+  Array.isArray(p.config.inventory)&&p.config.inventory.length===7&&p.config.inventory.every(v=>integer(v,0,51)||v===255);
+}
+function seedPeer(g,m,peer){
+ const i=peer.index,c=peer.config||{},character=c.character||{};
+ g.add(0x968+i*4).writeS32(1);g.add(0x5c+i*4).writeS32(i);
+ g.add(0x7c+i).writeU8(peer.team);g.add(0x86+i).writeU8(g.add(0x86).readU8());
+ copy(g.add(0x8e+i*20),g.add(0x8e),20);copy(m.add(0x1768+i*20),m.add(0x1768),20);
+ copy(g.add(0x12e+i*7),g.add(0x12e),7);
+ const model=(i===1?cfg.remoteModel:null)||character.model;
+ if(typeof model==='string'&&/^[a-z0-9_.-]{1,15}\.chr$/i.test(model)){
+  for(const p of [g.add(0x8e+i*20),m.add(0x1768+i*20)]){p.writeByteArray(new Uint8Array(20));p.writeUtf8String(model);}
+ }
+ const inventory=(i===1?cfg.remoteInventory:null)||c.inventory;
+ if(Array.isArray(inventory)&&inventory.length===7&&inventory.every(v=>integer(v,0,51)||v===255))g.add(0x12e+i*7).writeByteArray(inventory);
+ const name=String(c.name||character.name||'Player '+(peer.slot??i)).replace(/[^ -~]/g,'').slice(0,63)||'Player '+i;
+ g.add(0x166+i*0x100).writeByteArray(new Uint8Array(0x100));g.add(0x166+i*0x100).writeUtf8String(name);g.add(0x990+i*4).writeS32(0);
+ g.add(0xad0+i*0x98).writeByteArray(new Uint8Array(0x98));g.add(0xf90+i*0x98).writeByteArray(new Uint8Array(0x98));
+ g.add(0xab0+i*4).writeS32(0);g.add(0x9b0+i*32).writeByteArray(new Uint8Array(32));g.add(0x1450+i).writeU8(0);
+ globalThis.KARMA_SET_PEER_RANK?.(i,c.rank);
+}
+// The engine has eight model-cache entries. Preserve a displaced asset until this
+// process exits because inactive actor instances can still reference it. Reusing
+// the retained asset bounds memory by the 20 supported character models, rather
+// than the number of join/leave operations.
+const retainedModels=new Map();
+const supportedModels=new Set(['cpom_050','cpoo_030','cpos_030','cpom_010','cpom_020','cpom_040','cpos_010','cpos_021','cpos_033','cpos_040','cpes_010','cpeo_010','cpes_050','cpes_020','cpes_040','cpeg_050','cpep_010','cpep_020','cper_020','cpes_060'].map(n=>n+'.chr'));
+function modelCacheEntry(index,p){
+ const registry=st.m.add(0x105c).readPointer();
+ return {p,value:registry.add(0x10+index*4).readPointer(),matrix:registry.add(0x30+index*64).readByteArray(64),texture:registry.add(0x230+index*4).readS32(),surface:registry.add(0x258+index*4).readPointer()};
+}
+function ensureModel(peer){
+ const m=st.m,name=peer.config.character.model.toLowerCase(),text=st.gm.add(0x8e+peer.index*20);
+ if(!supportedModels.has(name))throw Error('Unsupported native character model');
+ const registry=m.add(0x105c).readPointer();
+ const entries=Array.from({length:8},(_,i)=>{const p=m.add(0x48+i*4).readPointer();return {i,p,name:p.isNull()?null:p.add(8).readUtf8String().toLowerCase()};});
+ for(const e of entries)if(e.name)retainedModels.set(e.name,modelCacheEntry(e.i,e.p));
+ if(entries.some(e=>e.name===name))return;
+ const used=new Set([st.p.add(0x1f00).readS32(),...peers.filter(p=>!p.left&&p.id!==peer.id&&p.r).map(p=>p.r.add(0x1f00).readS32())]);
+ const target=entries.find(e=>e.p.isNull())||entries.find(e=>!used.has(e.i));
+ if(!target)throw Error('No free character model slot');
+ if(retainedModels.has(name)){
+  const saved=retainedModels.get(name);
+  m.add(0x48+target.i*4).writePointer(saved.p);
+  registry.add(0x10+target.i*4).writePointer(saved.value);
+  registry.add(0x30+target.i*64).writeByteArray(saved.matrix);
+  registry.add(0x230+target.i*4).writeS32(saved.texture);
+  registry.add(0x258+target.i*4).writePointer(saved.surface);
+ }else{
+  // The original loader selects the first empty slot, or its fallback index when
+  // all eight are occupied. Do not null a middle entry: model lookup assumes a
+  // packed cache until its matching entry is reached.
+  registry.add(0x230+target.i*4).writeS32(-1);registry.add(0x258+target.i*4).writePointer(P(0));
+  nativeLoadModel(m,text,target.i,st.gm.add(0x988).readS32());
+  const loaded=m.add(0x48+target.i*4).readPointer();
+  if(loaded.isNull()||loaded.add(8).readUtf8String().toLowerCase()!==name)throw Error('Character model failed to load');
+  retainedModels.set(name,modelCacheEntry(target.i,loaded));
+ }
+}
+function updateNativeCount(){
+ st.m.add(0x1070).writeS32(Math.max(0,...peers.filter(p=>!p.left).map(p=>p.index))+1);
+ nativeSort(st.gm);
+}
 function hidePeer(peer){
- peer.left=true;peer.dead=true;
- if(peer.r){peer.r.add(0x1e24).writeU8(0);peer.r.add(0x19b0).writeS32(0);peer.r.add(0x19ac).writeS32(0);}
+ peer.left=true;peer.dead=true;peer.latest=null;
+ if(peer.r){peer.r.add(0x1e24).writeU8(0);peer.r.add(0x19b0).writeS32(0);peer.r.add(0x19ac).writeS32(0);peer.r.add(0x19b4).writeS32(0);}
+ if(st.gm){st.gm.add(0x968+peer.index*4).writeS32(0);st.gm.add(0x166+peer.index*0x100).writeU8(0);}
+ if(st.m&&st.gm)updateNativeCount();
+ globalThis.KARMA_SET_PEER_RANK?.(peer.index,null);
+}
+function joinPeer(value){
+ if(!authoritative||teamMode||cfg.match?.mode!=='dm'||!validPeer(value))return;
+ if(peers.some(p=>p.id===value.playerId&&!p.left))return;
+ const index=Array.from({length:7},(_,i)=>i+1).find(i=>!peers.some(p=>p.index===i&&!p.left));
+ if(!index)throw Error('Native participant capacity exceeded');
+ const old=peerByIndex(index),peer={...value,index,id:value.playerId,r:st.m.add(0xfcc+index*4).readPointer(),life:0,seq:-1,dead:false,paused:false,left:false,latest:null,shots:new Set(),hits:new Set()};
+ if(peer.r.isNull())throw Error('Original actor slot was not allocated');
+ if(old)peers.splice(peers.indexOf(old),1,peer);else peers.push(peer);
+ seedPeer(st.gm,st.m,peer);ensureModel(peer);nativeReset(peer.r);
+ if(!nativeConfigure(st.m,index,peer.team,st.gm.add(0x8e+index*20),6,st.gm.add(0x166+index*0x100),st.gm.add(0x12e+index*7),0))throw Error('Native actor configuration failed');
+ peer.r.add(0x1e58).writeU8(0);peer.r.add(0x288).writeS32(0);peer.r.add(0x15c).writeS32(0);
+ peer.r.add(0x1e24).writeU8(0);peer.r.add(0x19b0).writeS32(0);peer.r.add(0x19ac).writeS32(0);peer.r.add(0x19b4).writeS32(0);
+ st.gm.add(0x1458+index*16).writeByteArray(new Uint8Array(16));
+ updateNativeCount();syncLegacy();
+ send({event:'lan-peer-joined',playerId:peer.id,index,slot:peer.slot,model:peer.config.character.model,modelIndex:peer.r.add(0x1f00).readS32()});
+}
+function applySnapshot(x){
+ for(const p of x.players){const index=nativeIndex(p.playerId);if(index<0)continue;
+  st.gm.add(0x1458+index*16).writeS32(p.kills);st.gm.add(0x1460+index*16).writeU16(p.deaths);}
+ nativeSort(st.gm);send({event:'lan-match-snapshot',scores:scores(),remainingSeconds:x.remainingSeconds});
 }
 function processMessage(x){
+ if(x.type==='peer-joined'){joinPeer(x.peer);return;}
+ if(x.type==='match-snapshot'){applySnapshot(x);return;}
  if(x.type==='round-ended'){intermission=true;send({event:'lan-round-ended',...x});return;}
  if(x.type==='round-start'){nextRound=x;intermission=false;return;}
- if(['drop','drop-removed','pickup-grant','pickup-denied'].includes(x.type)){lootMessage(x);return;}
+ if(['drop','drop-removed','pickup-grant','pickup-denied','drop-grant','drop-denied'].includes(x.type)){lootMessage(x);return;}
  if(x.type==='death-confirmed'){
   const d=x.receipt,victim=nativeIndex(d.victimId),attacker=d.verified?nativeIndex(d.killerId):-1;
   if(victim>=0)countDeath(victim,d.victimLife,attacker,d.weapon);return;
@@ -241,23 +344,7 @@ Interceptor.attach(P(0x420560),{
   // These arrays each have eight native entries. Seed the complete online profile
   // records before the original loader instantiates actors and target badges.
   g.add(0x7c).writeU8(selfTeam);m.add(0x1140).writeS32(teamMode?1:0);
-  for(const peer of peers){
-   const i=peer.index,c=peer.config||{},character=c.character||{};
-   g.add(0x968+i*4).writeS32(1);g.add(0x5c+i*4).writeS32(i);
-   g.add(0x7c+i).writeU8(peer.team);g.add(0x86+i).writeU8(g.add(0x86).readU8());
-   copy(g.add(0x8e+i*20),g.add(0x8e),20);copy(m.add(0x1768+i*20),m.add(0x1768),20);
-   copy(g.add(0x12e+i*7),g.add(0x12e),7);
-   const model=(i===1?cfg.remoteModel:null)||character.model;
-   if(typeof model==='string'&&/^[a-z0-9_.-]{1,15}.chr$/i.test(model)){
-    for(const p of [g.add(0x8e+i*20),m.add(0x1768+i*20)]){p.writeByteArray(new Uint8Array(20));p.writeUtf8String(model);}
-   }
-   const inventory=(i===1?cfg.remoteInventory:null)||c.inventory;
-   if(Array.isArray(inventory)&&inventory.length===7&&inventory.every(v=>integer(v,0,51)||v===255))g.add(0x12e+i*7).writeByteArray(inventory);
-   const name=String(c.name||character.name||'Player '+(peer.slot??i)).replace(/[^ -~]/g,'').slice(0,63)||'Player '+i;
-   g.add(0x166+i*0x100).writeUtf8String(name);g.add(0x990+i*4).writeS32(0);
-   g.add(0xad0+i*0x98).writeByteArray(new Uint8Array(0x98));g.add(0xf90+i*0x98).writeByteArray(new Uint8Array(0x98));
-   g.add(0xab0+i*4).writeS32(0);g.add(0x9b0+i*32).writeByteArray(new Uint8Array(32));g.add(0x1450+i).writeU8(0);
-  }
+  for(const peer of peers)seedPeer(g,m,peer);
   seedLoadouts(g);
   send({event:'lan-roster-seeded',role:cfg.role,players:peers.length+1,peers:peers.map(p=>({id:p.id,index:p.index,team:p.team}))});
  }
@@ -401,8 +488,7 @@ Interceptor.attach(P(0x451380),{
  onEnter(){
   if(!st.localPlaced||st.closed)return;
   const m=this.context.ecx;
-  if(m.add(0x1070).readS32()<2)return;
-  if(m.add(0x1070).readS32()<peers.length+1)return;
+  if(m.add(0x1070).readS32()<1)return;
   st.m=m;st.p=m.add(0xfcc).readPointer();
   st.p.add(0x262).writeU8(selfTeam);m.add(0x1140).writeS32(teamMode?1:0);
   for(const peer of peers){peer.r=m.add(0xfcc+4*peer.index).readPointer();peer.r.add(0x262).writeU8(peer.team);}
@@ -431,7 +517,7 @@ Interceptor.attach(P(0x451380),{
   localDeath();
   if(now()-st.lastState>=50)sendState();
   if(now()-st.lastLog>=2000){st.lastLog=now();send({event:'lan-tick',role:cfg.role,life:st.life,remoteLife:st.remoteLife,
-   localHp:hp(st.p),remoteHp:hp(st.r),localPos:vec(st.p,0x1a40),remotePos:vec(st.r,0x1a40),
+   localHp:hp(st.p),remoteHp:st.r?hp(st.r):null,localPos:vec(st.p,0x1a40),remotePos:st.r?vec(st.r,0x1a40):null,
    renderCalls:st.renderCalls,sentHits:st.sentHits,receivedHits:st.receivedHits,remoteShots:st.remoteShots,queue:st.queue.length});}
  }
 });
@@ -451,12 +537,13 @@ rpc.exports=Object.assign(rpc.exports||{},{
   st.queue.push(message);return {queued:true};
  },
  lanstatus(){return {ready:st.ready,role:cfg.role,life:st.life,remoteLife:st.remoteLife,localDead:st.localDead,
-  local:st.ready?localPose():null,remote:st.latestRemote,remoteActual:st.ready?{
+  local:st.ready?localPose():null,remote:st.latestRemote,remoteActual:st.ready&&st.r?{
    pos:vec(st.r,0x1a40),hp:hp(st.r),yaw:st.r.add(0x19b8).readFloat(),weapon:st.r.add(0x290).readU8(),
    sector:st.r.add(0x1b44).readS32(),model:st.r.add(0x1f00).readS32(),spawned:st.r.add(0x19b0).readS32()}:null,
   scores:scores(),peers:peers.map(p=>({id:p.id,index:p.index,team:p.team,life:p.life,left:p.left,dead:p.dead,latest:p.latest,
-   actual:p.r?{pos:vec(p.r,0x1a40),hp:hp(p.r),weapon:p.r.add(0x290).readU8(),team:p.r.add(0x262).readU8()}:null})),
-  queue:st.queue.length,loadout:inventoryStatus(),
+   actual:p.r?{pos:vec(p.r,0x1a40),hp:hp(p.r),weapon:p.r.add(0x290).readU8(),team:p.r.add(0x262).readU8(),model:p.r.add(0x1f00).readS32(),visible:p.r.add(0x1e24).readU8(),spawned:p.r.add(0x19b0).readS32(),active:p.r.add(0x19b4).readS32(),rank:st.gm.add(0xb04+p.index*0x98).readS32()}:null})),
+  queue:st.queue.length,loadout:inventoryStatus(),retainedModelCount:retainedModels.size,
+  modelCache:st.ready?Array.from({length:8},(_,i)=>{const p=st.m.add(0x48+i*4).readPointer();return {index:i,pointer:p.toString(),name:p.isNull()?null:p.add(8).readUtf8String().toLowerCase()};}):[],
   sentHits:st.sentHits,receivedHits:st.receivedHits,remoteShots:st.remoteShots,hitHooks:st.hitHooks,renderCalls:st.renderCalls};},
  placeLocal(pos,sector,yaw=0){
   if(processName!=='karmaaiprobe.exe')throw new Error('Placement is test-process-only');

@@ -17,6 +17,8 @@ const multiplayerMaps=readJson(path.join(support,'multiplayer-maps.json')).maps;
 const statusPath=path.join(support,'lan-status.json'),cancelPath=path.join(support,'lan-cancel.json');
 const startPath=path.join(support,'lan-start.json');
 const logPath=path.join(support,'last-session.log');
+const lootHintPath=path.join(support,'loot-hint.json');
+try{fs.unlinkSync(lootHintPath);}catch{}
 fs.writeFileSync(logPath,'');
 try{fs.unlinkSync(cancelPath);}catch{}
 try{fs.unlinkSync(startPath);}catch{}
@@ -33,6 +35,7 @@ const stop=async(reason,error=false)=>{
   if(closing)return;closing=true;
   endReason=reason;
   if(error)failureReason=reason;
+  try{fs.unlinkSync(lootHintPath);}catch{}
   status(error?'error':'ended',reason);
   if(error)log('launch-error',{message:reason});else log('lan-ended',{message:reason});
   try{peer?.close();}catch{}
@@ -85,12 +88,12 @@ try{
   const central=options.transport==='central';
   let config={map:central?(options.config?.map??0):0,age:0,character:localCharacter,
     ...(central?{inventory:options.config.inventory,selectedWeapon:options.config.selectedWeapon}:{}),
-    settings:{build:central?'karma290-central4':'karma290-lan1',mode:1}};
+    settings:{build:central?'karma290-central5':'karma290-lan1',mode:1}};
   if(!multiplayerMaps.some(map=>map.mapIndex===config.map))throw Error('멀티플레이 지원 전장을 선택하세요.');
   status('connecting',options.role==='host'?'방을 준비하고 있습니다.':'방에 접속하고 있습니다.');
   peer=await (central?createCentralPeer:createLanPeer)({
     role:options.role,host:options.host,port:options.port||29020,code:String(options.code),config,
-    maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',manualStart:central,
+    maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',manualStart:central,roomId:options.roomId,
     onStatus:detail=>{
       log('lan-status',detail);
       const phase=detail.phase||detail.type||detail.status;
@@ -157,7 +160,9 @@ try{
   if(runtime.validationSeconds>0&&runtime.validationSeconds<=120)
     validationTimer=setTimeout(()=>stop('테스트 제한 시간이 끝났습니다.'),runtime.validationSeconds*1000);
   session=await device.attach(pid);checkClosing();
-  const lanConfig={role:options.role,localCharacter,remoteCharacter,local:config,remote:remoteHello.config,remoteHello,
+  const equipment=readJson(path.join(support,'loadouts.json'));
+  const equipmentCatalog={weapons:equipment.weapons.filter(w=>w.age===0).map(w=>({id:w.id,name:w.name,cost:w.inventoryCost})),inventoryCapacity:(equipment.characters[localCharacter.id]?.inventoryCapacity||0)+(config.rank?.budgetBonus||0)};
+  const lanConfig={equipmentCatalog,role:options.role,localCharacter,remoteCharacter,local:config,remote:remoteHello.config,remoteHello,
     central,localPlayerId:peer.playerId,remotePlayerId:peer.remotePlayerId,
     peers:central?peer.peers:undefined,slot:peer.slot,team:peer.team,match:peer.match};
   let source='globalThis.KARMA_LAN_CONFIG='+JSON.stringify(lanConfig)+';\n';
@@ -173,6 +178,9 @@ try{
     if(payload.event==='lan-damage-proof'){
       if(central)try{peer.send({type:'damage-proof',proof:payload.proof});}catch(error){stop(String(error),true);}
       return;
+    }
+    if(payload.event==='lan-loot-hint'&&typeof payload.message==='string'){
+      fs.writeFileSync(lootHintPath,JSON.stringify({gamePid:pid,expiresAt:Date.now()+Math.max(500,Math.min(10000,Number(payload.ttlMs)||3000)),message:payload.message.slice(0,200)}));
     }
     log('agent',payload);
     if(payload.event==='offline-player-death')status('playing',peer.match?.mode==='tdm'?'전사 · 팀전은 다음 라운드에 다시 등장합니다.':peer.match?.mode==='dm'?'전사 · 10초 후 랜덤 위치에서 다시 등장합니다.':'전사 · 잠시 후 다시 등장합니다.');
@@ -201,5 +209,6 @@ try{
 }finally{
   clearTimeout(startupTimer);clearTimeout(validationTimer);clearInterval(keepAlive);cleanMenu();
   closeCoinHud?.();
+  try{fs.unlinkSync(lootHintPath);}catch{}
   try{fs.unlinkSync(settingsPath);}catch{}
 }

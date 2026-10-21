@@ -5,10 +5,11 @@
   const cfg = globalThis.KARMA_LAN_CONFIG;
   let localRank = cfg?.local?.rank || globalThis.KARMA_ACCOUNT_PROFILE?.rank;
   let gm = null, dirty = false;
+  const peerRanks = new Map((cfg?.peers || [cfg?.remoteHello]).filter(Boolean).map((p,i)=>[i+1,p.config?.rank]));
   const ordinal = rank => Object.prototype.hasOwnProperty.call(rankIds, rank?.id) ? rankIds[rank.id] : 0;
   function apply() {
     if (!gm) return;
-    const records = [localRank, ...(cfg?.peers || [cfg?.remoteHello]).filter(Boolean).map(p => p.config?.rank)];
+    const records = Array.from({length:8},(_,i)=>i===0?localRank:peerRanks.get(i));
     for (let i = 0; i < Math.min(8, records.length); i++) {
       const value = ordinal(records[i]);
       gm.add(0xb04 + i * 0x98).writeS32(value);
@@ -21,6 +22,10 @@
     send({event:'account-rank-applied',rank:localRank?.id || 'recruit',nativeRank:ordinal(localRank),
       roster:records.map(ordinal)});
   }
+  globalThis.KARMA_SET_PEER_RANK = (index,rank) => {
+    if (!Number.isInteger(index)||index<1||index>7) throw Error('Invalid native rank slot');
+    peerRanks.set(index,rank);dirty=true;
+  };
   Interceptor.attach(ptr('0x420560'), {
     onEnter(){this.gm = this.context.ecx;},
     onLeave(result){if (result.toInt32() !== 0) {gm = this.gm; apply();}}

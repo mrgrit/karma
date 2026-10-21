@@ -39,6 +39,7 @@ function create(role,config={}){
  m.add(0x1050).writePointer(local);m.add(0x104c).writePointer(backend);backend.add(0x36d).writeByteArray([7,8]);
  m.add(0xc).writePointer(world);world.add(0x1399c).writePointer(worldData);worldData.add(0x12c).writeS32(10);
  m.add(0x18).writePointer(projectiles);
+ const app=p(0xc0000),input=p(0xd0000);p(0x548d5c).writePointer(app);app.add(0x120).writePointer(input);p(0x548d50).writePointer(p(0xf1000));
  gm.add(0xc).writePointer(m);gm.add(0x8e).writeUtf8String('guderian.chr');
  gm.add(0x12e).writeByteArray([0,9,6,28,19,23,24]);p(0x548d70).writeS32(1);
  for(const a of[local,remote]){
@@ -55,11 +56,12 @@ function create(role,config={}){
   a.add(0x1b4c).writeS32(sector);a.add(0x19b8).writeFloat(yaw);
   xyz.forEach((v,i)=>a.add(0x1c84+i*4).writeFloat(v+(i===1?300:0)));
  }
- const context={ptr:p,Process:{mainModule:{name:'KarmaSession.exe'},id:role==='host'?1:2},
+ const context={ptr:p,Process:{mainModule:{name:'KarmaSession.exe'},id:role==='host'?1:2,getModuleByName:()=>({getExportByName:()=>p(0xf0000)})},
   KARMA_LAN_CONFIG:{role,...config},KARMA_LOCAL_PAUSED:false,Date:{now:()=>time},send:e=>events.push(e),rpc:{exports:{}},
   Memory:{alloc(n){const r=p(allocation);allocation+=n;return r;},allocUtf8String(s){const r=p(allocation);allocation+=s.length+1;r.writeUtf8String(s);return r;}},
   Interceptor:{attach(address,h){const list=hooks.get(address.a)||[];list.push(h);hooks.set(address.a,list);}},
   NativeFunction:function(address){return (...args)=>{
+   if(address.a===0xf0000)return p(0xf1000);
    calls.push([address.a,...args]);
    const actor=args[0];
    switch(address.a){
@@ -199,7 +201,9 @@ loadout.local.add(0x1e61).writeU8(10);
 const retval=loadout.p(1);loadout.leave(frames,retval);
 assert.equal(retval.toInt32(),0);
 assert.deepEqual([...new Uint8Array(loadout.local.add(0x1e60).readByteArray(70))],savedKeys);
-assert.equal(loadout.events.filter(e=>e.message?.type==='pickup-claim').length,1,'native proximity sends one claim');
+assert.equal(loadout.events.filter(e=>e.message?.type==='pickup-claim').length,0,'native proximity cannot auto-pickup');
+loadout.p(0xd0000+0x52).writeU8(0x80);loadout.tick();
+assert.equal(loadout.events.filter(e=>e.message?.type==='pickup-claim').length,1,'E sends one explicit claim');
 loadout.leave(loadout.enter(0x452540,[loadout.p(10)],loadout.m,{returnAddress:loadout.p(0x4526b1),context:{ecx:loadout.m,ebx:loadout.p(0)}}),loadout.p(1));
 assert.equal(loadout.events.filter(e=>e.message?.type==='pickup-claim').length,1,'pending claim deduplicates');
 const grant={id:'grant-1',dropId:'drop-1',playerId:'local-player',life:1,weapon:10,magazine:2,reserve:5,replaceSlot:7,replacedWeapon:255};
@@ -244,3 +248,15 @@ assert.equal(new Set(firstRoom).size,8,'All eight initial DM spawns must be dist
 assert.deepEqual(initialPositions('room-alpha'),firstRoom,'All clients agree on one room permutation');
 assert.notDeepEqual(initialPositions('room-beta'),firstRoom,'A new room changes initial positions');
 console.log('PASS: room-specific random initial deathmatch spawns without overlap.');
+
+// A late entrant receives a stripped baseline, then live states may still carry
+// the previous shot. It must replay only shots newer than that baseline.
+const lateShot=create('host');
+const baseline={...host.rpc.lanstatus().local,version:1,type:'state',life:1,seq:1,shotSequence:40};delete baseline.shot;
+lateShot.rpc.lanreceive(baseline);lateShot.tick();
+const oldShot={id:40,life:1,weapon:6,origin:[0,700,0],direction:[1,0,0],sector:4,renderSector:4,yaw:0,pitch:0};
+lateShot.rpc.lanreceive({...baseline,seq:2,shot:oldShot});lateShot.tick();
+assert.equal(lateShot.rpc.lanstatus().remoteShots,0,'Old retained shot must not replay after late-join snapshot');
+lateShot.rpc.lanreceive({...baseline,seq:3,shotSequence:41,shot:{...oldShot,id:41}});lateShot.tick();
+assert.equal(lateShot.rpc.lanstatus().remoteShots,1,'New shot after join must replay once');
+console.log('PASS late-join shot baseline suppresses historical shots and preserves new fire.');

@@ -216,6 +216,7 @@ namespace KarmaLocal {
     ComboBox modes,eras;
     TextBox search;
     FlowLayoutPanel grid;
+    RoomDirectory roomDirectory;
     Label heading, count, summary, status, selection, characterName, characterCamp, weaponInfo, rankInfo;
     Label myName,myRank,myXp,myResults,myMatches,myKd,myRatio,myWinrate,mySync;
     PictureBox portrait;
@@ -256,7 +257,7 @@ namespace KarmaLocal {
       initializing=false; SelectDefaults(); RefreshCards();
       watcher=new System.Windows.Forms.Timer{Interval=1200};
       watcher.Tick+=(s,e)=>UpdateRunning(); watcher.Start();
-      Shown+=async(s,e)=>{FitWorkingArea();await SyncMyStats();};
+      Shown+=async(s,e)=>{FitWorkingArea();await SyncMyStats();if(JoinMode)await roomDirectory.RefreshRooms();};
       FormClosing+=(s,e)=>{closingLauncher=true;};
       FormClosed+=(s,e)=>{watcher.Stop();if(sessionActive&&sessionLan)CancelLan();SavePreferences();if(sessionHelper!=null)sessionHelper.Dispose();foreach(Image i in images.Values)i.Dispose();};
     }
@@ -324,7 +325,7 @@ namespace KarmaLocal {
       modes=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(20,51),Width=194,FlatStyle=FlatStyle.Flat};
       modes.Items.AddRange(new object[]{"맵 자유 탐험","저격 맵 탐험","사격 연습","AI 1명 대전 (시험판)","서버 방 만들기 (2~8인)","서버 참가 (2~8인)"});
       modes.SelectedIndex=0; sidebar.Controls.Add(modes);
-      modes.SelectedIndexChanged+=(s,e)=>{if(!initializing){SelectDefaults();RefreshCards();}};
+      modes.SelectedIndexChanged+=async(s,e)=>{if(!initializing){if(JoinMode)tab=0;SelectDefaults();RefreshCards();if(JoinMode)await roomDirectory.RefreshRooms();}};
       LabelAt(sidebar,"시대",20,99,194,22,10,muted,true);
       eras=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(20,128),Width=194,FlatStyle=FlatStyle.Flat};
       eras.Items.AddRange(new object[]{"과거 · 2차 세계대전","미래"});eras.SelectedIndex=0;sidebar.Controls.Add(eras);
@@ -364,6 +365,10 @@ namespace KarmaLocal {
       contentLayout.Controls.Add(weaponInfo,0,2);
       grid=new FlowLayoutPanel{Dock=DockStyle.Fill,Margin=Padding.Empty,AutoScroll=true,WrapContents=true,Padding=new Padding(0,4,0,10),BackColor=BackColor};
       contentLayout.Controls.Add(grid,0,1);
+      roomDirectory=new RoomDirectory(support,NodePath){Visible=false};
+      roomDirectory.SelectionChanged+=(s,e)=>{if(!initializing&&!closingLauncher)UpdateSummary();};
+      roomDirectory.JoinRequested+=(s,e)=>Launch();
+      contentLayout.Controls.Add(roomDirectory,0,1);
     }
     Label StatsCard(TableLayoutPanel owner,int column,string caption,out Label value,out Label detail){
       var card=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Padding=new Padding(12,6,10,4),Margin=new Padding(4,0,4,0),BackColor=Color.FromArgb(30,40,48)};
@@ -390,6 +395,7 @@ namespace KarmaLocal {
     int GameMode { get {return modes.SelectedIndex==1?4:modes.SelectedIndex==2?5:1;} }
     bool AiReady { get {object v;return runtime.TryGetValue("aiReady",out v)&&Convert.ToBoolean(v);} }
     bool LanMode { get {return modes.SelectedIndex>=4;} }
+    bool JoinMode { get {return modes.SelectedIndex==5;} }
     bool IsAdmin { get {object value;return !profileLoginRequired&&cachedProfile!=null&&cachedProfile.TryGetValue("isAdmin",out value)&&value is bool&&(bool)value;} }
     Dictionary<string,object> MultiplayerMap(CatalogItem item){
       object entries;if(item==null||multiplayerMaps==null||!multiplayerMaps.TryGetValue("maps",out entries)||!(entries is IEnumerable))return null;
@@ -431,6 +437,17 @@ namespace KarmaLocal {
     }
     void RefreshCards() {
       if(grid==null||initializing)return;
+      bool rooms=JoinMode&&tab==0;
+      tabs[0].Text=JoinMode?"개설된 방":"전장 선택";
+      string server;int serverPort;RoomServer(out server,out serverPort);
+      object account;roomDirectory.SetContext(server,serverPort,cachedProfile!=null&&cachedProfile.TryGetValue("playerId",out account)?Convert.ToString(account):"");
+      grid.Visible=!rooms;roomDirectory.Visible=rooms;
+      if(rooms){
+        roomDirectory.SetFilter(search.Text);
+        for(int i=0;i<tabs.Length;i++){tabs[i].BackColor=i==0?accent:Color.FromArgb(34,44,51);tabs[i].ForeColor=i==0?Color.FromArgb(25,28,26):ink;}
+        heading.Text="개설된 방";count.Text="방장 · 방 코드 · 맵으로 검색";weaponInfo.Visible=false;contentLayout.RowStyles[2].Height=0;
+        UpdateSummary();return;
+      }
       grid.SuspendLayout();foreach(Control c in grid.Controls.Cast<Control>().ToArray())c.Dispose();grid.Controls.Clear();
       foreach(Button b in tabs){b.BackColor=Color.FromArgb(34,44,51);b.ForeColor=ink;}
       tabs[tab].BackColor=accent;tabs[tab].ForeColor=Color.FromArgb(25,28,26);
@@ -458,7 +475,13 @@ namespace KarmaLocal {
       portrait.Image=Picture(character);characterName.Text=character!=null?character.Name:"캐릭터를 선택하세요";
       characterCamp.Text=CampName(character)+" · "+CharacterRole(character);
       UpdateRankInfo();
-      selection.Text=map!=null?"선택한 전장\n"+map.Name+"\n\nW/A/S/D 이동\n마우스 시점 · 왼쪽 클릭 발사\n"+(LanMode?"F10 메뉴 · Esc 종료":"F10 일시 정지 · Esc 종료"):"전장을 선택하세요.";
+      if(JoinMode){
+        var room=roomDirectory.SelectedRoom;
+        selection.Text=room==null?"개설된 방에서 참가할 방을 선택하세요.\n전장과 대전 방식은 방장이 정합니다.":"선택한 방  "+room.Code+"\n"+room.HostName+"\n"+room.MapName+"\n"+room.ModeName+"\n"+room.Players+" / "+room.MaxPlayers+"명";
+        summary.Text=(room==null?"참가할 방을 선택하세요":room.MapName+" · "+room.HostName+"의 방")+"  /  "+(character!=null?character.Name:"캐릭터 미선택");
+        UpdateRunning();return;
+      }
+      selection.Text=map!=null?"선택한 전장\n"+map.Name+"\n\nW/A/S/D 이동\n마우스 시점 · 왼쪽 클릭 발사\n"+(LanMode?"G 버리기 · E 줍기\nF10 메뉴 · Esc 종료":"F10 일시 정지 · Esc 종료"):"전장을 선택하세요.";
       summary.Text=(map!=null?map.Name:"전장 미선택")+"  /  "+(character!=null?character.Name:"캐릭터 미선택");
       if(tab==2&&weapon!=null)weaponInfo.Text=weapon.Name+"  ·  "+weapon.Read("category")+"  |  원본 게임 내 무기";
       UpdateRunning();
@@ -510,6 +533,7 @@ namespace KarmaLocal {
     }
     void UpdateRunning() {
       if(start==null)return;
+      if(roomDirectory!=null)roomDirectory.Enabled=!configuringLan&&!sessionActive&&!GameRunning();
       if(refreshStats!=null)refreshStats.Enabled=!refreshingStats&&!configuringLan&&!sessionActive&&!GameRunning();
       if(refreshingStats){start.Enabled=false;start.Text="전적 확인 중";accountButton.Enabled=false;loadoutButton.Enabled=false;return;}
       if(configuringLan){
@@ -537,9 +561,9 @@ namespace KarmaLocal {
       }
       modes.Enabled=!sessionActive&&!running;eras.Enabled=modes.Enabled&&modes.SelectedIndex<3;
       bool ai=modes.SelectedIndex==3;
-      start.Enabled=!running&&!sessionActive&&map!=null&&character!=null&&(!ai||AiReady);
-      start.Text=running?"게임 실행 중":sessionActive?"게임 시작 중":ai&&!AiReady?"AI 기능 준비 중":LanMode?(modes.SelectedIndex==4?"서버 방 만들기 →":"서버 참가 →"):"게임 시작  →";
-      status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · "+(modes.SelectedIndex==5?"참가 시 방장의 전장 적용":map!=null?map.Name:""):ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
+      start.Enabled=!running&&!sessionActive&&(JoinMode?roomDirectory.SelectionReady:map!=null)&&character!=null&&(!ai||AiReady);
+      start.Text=running?"게임 실행 중":sessionActive?"게임 시작 중":ai&&!AiReady?"AI 기능 준비 중":LanMode?(modes.SelectedIndex==4?"서버 방 만들기 →":"선택한 방 참가 →"):"게임 시작  →";
+      status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · "+(modes.SelectedIndex==5?"개설된 방을 선택해 참가":map!=null?map.Name:""):ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
     }
     void CloseLobby(){if(lobby!=null){var old=lobby;lobby=null;old.Dismiss();}}
     void RequestLanStart(string roomId){
@@ -763,34 +787,56 @@ namespace KarmaLocal {
       return node;
     }
     void CancelLan(){lobbyLeaving=true;CloseLobby();try{File.WriteAllText(Path.Combine(support,"lan-cancel.json"),"{}",Encoding.UTF8);}catch{}}
+    void RoomServer(out string host,out int port){
+      var selected=ReadSupportJson("server-selection.json");object value;IPAddress address;
+      host=selected!=null&&selected.TryGetValue("host",out value)?Convert.ToString(value):"192.168.12.100";
+      if(!IPAddress.TryParse(host,out address)||address.AddressFamily!=AddressFamily.InterNetwork||address.Equals(IPAddress.Any)||address.Equals(IPAddress.Broadcast))host="192.168.12.100";
+      else host=address.ToString();
+      port=JsonNumber(selected,"port",29020);if(port<1||port>65534)port=29020;
+    }
     async Task LaunchLan(){
-      using(var dialog=new LanSetup(modes.SelectedIndex==4,support)){
-        if(dialog.ShowDialog(this)!=DialogResult.OK)return;
-        if(!await EnsureCentralAccount(dialog.Host,dialog.Port))return;
-        if(map==null||MapIndex(map)<0)throw new InvalidOperationException("멀티플레이 지원 전장을 선택하세요.");
-        var loadout=ChooseLoadout();
-        if(loadout==null)return;
-        string configPath=Path.Combine(support,"lan-config-"+Guid.NewGuid().ToString("N")+".json");
-        var options=new Dictionary<string,object>{
-          {"transport","central"},{"role",modes.SelectedIndex==4?"host":"join"},{"host",dialog.Host},{"port",dialog.Port},{"code",dialog.Code},{"maxPlayers",dialog.MaxPlayers},{"matchMode",dialog.MatchMode},
-          {"config",new Dictionary<string,object>{
-            {"map",MapIndex(map)},{"age",0},
-            {"character",new Dictionary<string,object>{{"id",character.Id},{"index",character.Number("characterIndex",0)},
-              {"camp",character.Number("camp",0)},{"name",character.Read("enName")},
-              {"model",Path.GetFileName(character.Read("model").Replace('/',Path.DirectorySeparatorChar)).ToLowerInvariant()}}},
-            {"inventory",loadout["inventory"]},{"selectedWeapon",loadout["selectedWeapon"]}}}};
-        File.WriteAllText(configPath,json.Serialize(options),Encoding.UTF8);
-        try{File.Delete(Path.Combine(support,"lan-cancel.json"));File.Delete(Path.Combine(support,"lan-status.json"));}catch{}
-        SavePreferences();sessionStartedUtc=DateTime.UtcNow;sessionError="";
-        sessionHelper=Process.Start(new ProcessStartInfo{FileName=NodePath(),
-          Arguments="\""+Path.Combine(support,"lan-runtime.mjs")+"\" \""+configPath+"\"",
-          WorkingDirectory=game,UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
-        if(sessionHelper==null)throw new InvalidOperationException("중앙 서버 대전 도구를 시작할 수 없습니다.");
-        lobbyLeaving=false;sessionActive=true;sessionObservedGame=false;sessionLan=true;
-        lanDetails="서버 "+dialog.Host+":"+dialog.Port+"  ·  "+(modes.SelectedIndex==4?"방 만들기":"참가")+"  ·  코드 "+dialog.Code;
-        restoreState=WindowState==FormWindowState.Maximized?FormWindowState.Maximized:FormWindowState.Normal;
-        UpdateRunning();
+      bool hosting=!JoinMode;string host,code,matchMode,roomId="";int port,maxPlayers,mapIndex;
+      if(hosting){
+        using(var dialog=new LanSetup(true,support)){
+          if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+          host=dialog.Host;port=dialog.Port;code=dialog.Code;maxPlayers=dialog.MaxPlayers;matchMode=dialog.MatchMode;
+        }
+        mapIndex=MapIndex(map);
+      }else{
+        var selected=roomDirectory.SelectedRoom;
+        if(selected==null)throw new InvalidOperationException("개설된 방 목록에서 참가할 방을 선택하세요.");
+        string id=selected.RoomId;
+        await roomDirectory.RefreshRooms();if(closingLauncher||IsDisposed)return;
+        selected=roomDirectory.SelectedRoom;
+        if(selected==null||selected.RoomId!=id)throw new InvalidOperationException("선택한 방이 닫혔습니다. 다른 방을 선택하세요.");
+        if(!selected.CanJoin)throw new InvalidOperationException("방 상태가 변경되어 참가할 수 없습니다. 다른 방을 선택하세요.");
+        host=roomDirectory.Host;port=roomDirectory.Port;code=selected.Code;maxPlayers=selected.MaxPlayers;matchMode=selected.Mode;
+        mapIndex=selected.Map;roomId=selected.RoomId;
       }
+      if(!await EnsureCentralAccount(host,port))return;
+      if(mapIndex<0)throw new InvalidOperationException("멀티플레이 지원 전장을 선택하세요.");
+      var loadout=ChooseLoadout();if(loadout==null)return;
+      string configPath=Path.Combine(support,"lan-config-"+Guid.NewGuid().ToString("N")+".json");
+      var options=new Dictionary<string,object>{
+        {"transport","central"},{"role",hosting?"host":"join"},{"host",host},{"port",port},{"code",code},{"maxPlayers",maxPlayers},{"matchMode",matchMode},
+        {"config",new Dictionary<string,object>{
+          {"map",mapIndex},{"age",0},
+          {"character",new Dictionary<string,object>{{"id",character.Id},{"index",character.Number("characterIndex",0)},
+            {"camp",character.Number("camp",0)},{"name",character.Read("enName")},
+            {"model",Path.GetFileName(character.Read("model").Replace('/',Path.DirectorySeparatorChar)).ToLowerInvariant()}}},
+          {"inventory",loadout["inventory"]},{"selectedWeapon",loadout["selectedWeapon"]}}}};
+      if(!hosting)options["roomId"]=roomId;
+      File.WriteAllText(configPath,json.Serialize(options),Encoding.UTF8);
+      try{File.Delete(Path.Combine(support,"lan-cancel.json"));File.Delete(Path.Combine(support,"lan-status.json"));}catch{}
+      SavePreferences();sessionStartedUtc=DateTime.UtcNow;sessionError="";
+      sessionHelper=Process.Start(new ProcessStartInfo{FileName=NodePath(),
+        Arguments="\""+Path.Combine(support,"lan-runtime.mjs")+"\" \""+configPath+"\"",
+        WorkingDirectory=game,UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
+      if(sessionHelper==null)throw new InvalidOperationException("중앙 서버 대전 도구를 시작할 수 없습니다.");
+      lobbyLeaving=false;sessionActive=true;sessionObservedGame=false;sessionLan=true;
+      lanDetails="서버 "+host+":"+port+"  ·  "+(hosting?"방 만들기":"참가")+"  ·  코드 "+code;
+      restoreState=WindowState==FormWindowState.Maximized?FormWindowState.Maximized:FormWindowState.Normal;
+      UpdateRunning();
     }
     void WriteInt(byte[] bytes,int offset,int value) {
       if(offset<0||offset+4>bytes.Length)throw new InvalidDataException("실행 설정 위치가 올바르지 않습니다.");

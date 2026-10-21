@@ -8,8 +8,8 @@ import {fileURLToPath} from 'node:url';
 import {validateLanMessage} from './lan-transport.mjs';
 
 const LIMIT=64*1024, QUEUE_LIMIT=256*1024;
-const CONTROL=new Set(['damage-proof','pickup-claim']);
-const INBOUND=new Set(['drop','drop-removed','pickup-grant','pickup-denied','death-confirmed']);
+const CONTROL=new Set(['damage-proof','pickup-claim','drop-claim']);
+const INBOUND=new Set(['drop','drop-removed','pickup-grant','pickup-denied','drop-grant','drop-denied','death-confirmed']);
 export const defaultCa=path.join(path.dirname(fileURLToPath(import.meta.url)),'server-ca.pem');
 export function connectServer({host,port,secure=true,caFile=defaultCa}){
   return secure?tls.connect({host,port,ca:fs.readFileSync(caFile),rejectUnauthorized:true,
@@ -34,7 +34,7 @@ export function writeIdentity(filename,value){
 }
 export async function createCentralPeer({
   role,host='192.168.12.100',port=29020,code,config,maxPlayers=2,mode='duel',
-  secure=true,caFile=defaultCa,manualStart=false,
+  secure=true,caFile=defaultCa,manualStart=false,roomId,
   identityPath=identityPathFor(host,port),identity=readIdentity(identityPath),
   onMessage=()=>{},onStatus=()=>{},onProfile=()=>{},onIdentity=()=>{},
 }={}){
@@ -96,7 +96,7 @@ export async function createCentralPeer({
       peers=message.peers.length===1&&!message.peers[0].playerId?[message.remoteHello]:message.peers;
       if(new Set(peers.map(p=>p.playerId)).size!==peers.length||peers.some(p=>typeof p.playerId!=='string'||p.playerId===ownId))throw Error('중복 참가자입니다.');
       effectiveConfig=message.config;remoteId=message.remoteHello.playerId;slot=message.slot??slot;team=message.team??team;
-      match={...match,mode:message.mode??match.mode??'duel',maxPlayers:message.maxPlayers??peers.length+1,killLimit:message.killLimit,timeLimitSeconds:message.timeLimitSeconds,respawnMs:message.respawnMs,roundWinLimit:message.roundWinLimit};
+      match={...match,mode:message.mode??match.mode??'duel',maxPlayers:message.maxPlayers??peers.length+1,killLimit:message.killLimit,timeLimitSeconds:message.timeLimitSeconds,respawnMs:message.respawnMs,roundWinLimit:message.roundWinLimit,lateJoin:message.lateJoin===true,initialLife:message.initialLife??1};
       profile(message.profile);connected=true;settled=true;
       flushTimer=setInterval(flush,50);
       report({phase:'connected',code:roomCode});
@@ -109,11 +109,26 @@ export async function createCentralPeer({
     if(message.type==='round-start'||message.type==='round-ended'){report({phase:message.type,...message});onMessage({...message,version:1});return;}
     if(message.type==='death-confirmed'||message.type==='proof-rejected'){
       report({phase:message.type,...message});
-      if(message.type==='death-confirmed'&&['karma290-central3','karma290-central4'].includes(config.settings?.build))onMessage({...message,version:1});
+      if(message.type==='death-confirmed'&&['karma290-central3','karma290-central4','karma290-central5'].includes(config.settings?.build))onMessage({...message,version:1});
       return;
     }
     if(INBOUND.has(message.type)){onMessage({...message,version:1});return;}
-    if(message.type==='peer-left'){onMessage({version:1,type:'peer-left',playerId:message.playerId});return;}
+    if(message.type==='peer-joined'){
+      const p=message.peer;
+      if(!connected||match.mode!=='dm'||config.settings?.build!=='karma290-central5'||!p||typeof p.playerId!=='string'||p.playerId===ownId||!Number.isInteger(p.slot)||p.slot<0||p.slot>7||![0,1].includes(p.team)||!p.config)throw Error('Invalid joining participant');
+      if(peers.some(peer=>peer.playerId===p.playerId))return;
+      if(peers.length>=7||peers.some(peer=>peer.slot===p.slot))throw Error('Duplicate participant slot');
+      peers=[...peers,p];remoteId=peers[0]?.playerId;
+      onMessage({...message,version:1});report({phase:'peer-joined',players:peers.length+1});return;
+    }
+    if(message.type==='match-snapshot'){
+      if(!connected||!Array.isArray(message.players))throw Error('Invalid match snapshot');
+      onMessage({...message,version:1});return;
+    }
+    if(message.type==='peer-left'){
+      peers=peers.filter(p=>p.playerId!==message.playerId);remoteId=peers[0]?.playerId;
+      onMessage({version:1,type:'peer-left',playerId:message.playerId});return;
+    }
     if(message.type==='room-closed'||message.type==='room-ended'||message.type==='match-ended'){
       if(message.type==='match-ended')report({phase:'match-ended',result:message.result});
       onMessage({version:1,type:'leave',reason:message.reason||'peer-left'});return;
@@ -125,7 +140,7 @@ export async function createCentralPeer({
   socket.once(secure?'secureConnect':'connect',()=>{
     report({phase:'connecting',server:host});
     write({type:'hello',version:2,op:role==='host'?'create':'join',code,
-      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart});
+      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,...(roomId?{roomId}:{})});
   });
   socket.on('data',chunk=>{
     try{

@@ -21,5 +21,10 @@ for(const [id,expected] of Object.entries({recruit:0,private:1,corporal:3,sergea
   assert.equal(bytes.get(gm.value+0xfc4),expected);
   assert.equal(bytes.get(gm.value+0xfc4+0x98),1,'promotion must not change another player');
 }
+context.KARMA_SET_PEER_RANK(3,{id:'corporal'});hooks.get(0x451380).onEnter();
+assert.equal(bytes.get(gm.value+0xb04+3*0x98),3,'late entrant rank uses its native slot');
+context.KARMA_SET_PEER_RANK(1,null);context.KARMA_SET_PEER_RANK(1,{id:'lieutenant'});hooks.get(0x451380).onEnter();
+assert.equal(bytes.get(gm.value+0xfc4+0x98),8,'replacement rank updates without moving existing slots');
+assert.equal(bytes.get(gm.value+0xfc4+2*0x98),4,'other peer rank remains stable');
 assert.throws(()=>context.rpc.exports.accountrank({id:'admin'}),/Invalid/);
 console.log('PASS native rank mapping: HUD, scoreboard, distinct peers and queued promotions.');

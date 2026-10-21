@@ -1,0 +1,143 @@
+Target: outputs\Karma\App_Executables\Karma.exe
+SHA256: aa824dda4d48c0304de3e9ab1c6012c542dc280eca93a6d507da9a21c4bbedab
+Observed native pickup: active item, distance <300 around player feet+100, line-of-sight routine 0x4df8b0, then 0x452540 with index EBX. No keyboard query in pickup routine.
+Observed key getter: 0x4a8330 reads [input+scan+0x40] & 0x80; configurable action dispatcher 0x40a4f9 calls it. E=scan 0x12 and G=0x22 are reserved in LAN by hook, original query returns 0.
+
+BLOCK 0x4525e0
+004525e0: sub esp, 0xc
+004525e3: push ebx
+004525e4: push ebp
+004525e5: push esi
+004525e6: mov esi, ecx
+004525e8: push edi
+004525e9: mov eax, dword ptr [esi + 0x1064]
+004525ef: lea edi, [esi + 0xbc]
+004525f5: mov ecx, dword ptr [esi + eax*4 + 0xfcc]
+004525fc: add ecx, 0x1a40
+00452602: xor ebx, ebx
+00452604: mov ebp, dword ptr [ecx]
+00452606: mov dword ptr [esp + 0x10], ebp
+0045260a: mov edx, dword ptr [ecx + 4]
+0045260d: mov dword ptr [esp + 0x14], edx
+00452611: fld dword ptr [esp + 0x14]
+00452615: fadd dword ptr [0x52c508]
+0045261b: mov eax, dword ptr [ecx + 8]
+0045261e: mov dword ptr [esp + 0x18], eax
+00452622: fstp dword ptr [esp + 0x14]
+00452626: mov al, byte ptr [edi - 0xc]
+00452629: test al, al
+0045262b: je 0x4526b5
+00452631: fld dword ptr [edi - 8]
+00452634: fsub dword ptr [esp + 0x10]
+00452638: fld dword ptr [edi - 4]
+0045263b: fsub dword ptr [esp + 0x14]
+0045263f: fld dword ptr [edi]
+00452641: fsub dword ptr [esp + 0x18]
+00452645: fld st(0)
+00452647: fmul st(1)
+00452649: fld st(2)
+0045264b: fmul st(3)
+0045264d: faddp st(1)
+0045264f: fld st(3)
+00452651: fmul st(4)
+00452653: faddp st(1)
+00452655: fsqrt 
+00452657: fstp st(3)
+00452659: fstp st(0)
+0045265b: fstp st(0)
+0045265d: fcomp dword ptr [0x52c6c4]
+00452663: fnstsw ax
+00452665: test ah, 1
+00452668: je 0x4526b5
+0045266a: mov edx, dword ptr [esp + 0x14]
+0045266e: sub esp, 0xc
+00452671: mov ecx, esp
+00452673: sub esp, 0xc
+00452676: mov eax, dword ptr [edi + 4]
+00452679: mov dword ptr [ecx], ebp
+0045267b: mov dword ptr [ecx + 4], edx
+0045267e: mov edx, dword ptr [esp + 0x30]
+00452682: mov dword ptr [ecx + 8], edx
+00452685: mov edx, dword ptr [edi - 8]
+00452688: mov ecx, esp
+0045268a: push eax
+0045268b: push eax
+0045268c: mov dword ptr [ecx], edx
+0045268e: mov edx, dword ptr [edi - 4]
+00452691: mov dword ptr [ecx + 4], edx
+00452694: mov edx, dword ptr [edi]
+00452696: mov dword ptr [ecx + 8], edx
+00452699: mov ecx, dword ptr [esi + 0x14]
+0045269c: call 0x4df8b0
+004526a1: test eax, eax
+004526a3: je 0x4526b5
+004526a5: movsx eax, byte ptr [edi - 0xb]
+004526a9: push eax
+004526aa: mov ecx, esi
+004526ac: call 0x452540
+004526b1: test eax, eax
+004526b3: jne 0x4526ca
+
+BLOCK 0x40a4f2
+0040a4f2: xor edx, edx
+0040a4f4: mov dl, byte ptr [eax + esi*2 + 9]
+0040a4f8: push edx
+0040a4f9: call 0x4a8330
+0040a4fe: test al, al
+0040a500: je 0x40a50b
+0040a502: mov eax, 1
+0040a507: pop esi
+0040a508: ret 4
+0040a50b: xor eax, eax
+0040a50d: pop esi
+0040a50e: ret 4
+
+BLOCK 0x4a8330
+004a8330: mov eax, dword ptr [esp + 4]
+004a8334: mov al, byte ptr [eax + ecx + 0x40]
+004a8338: and eax, 0x80
+
+BLOCK 0x4a81c0
+004a81c0: push ebx
+004a81c1: push esi
+004a81c2: mov esi, ecx
+004a81c4: push edi
+004a81c5: mov eax, dword ptr [esi + 4]
+004a81c8: test eax, eax
+004a81ca: je 0x4a8211
+004a81cc: lea ebx, [esi + 0x40]
+004a81cf: mov ecx, 0x40
+004a81d4: xor eax, eax
+004a81d6: mov edi, ebx
+004a81d8: rep stosd dword ptr es:[edi], eax
+004a81da: mov eax, dword ptr [esi + 4]
+004a81dd: push ebx
+004a81de: push 0x100
+004a81e3: push eax
+004a81e4: mov ecx, dword ptr [eax]
+004a81e6: call dword ptr [ecx + 0x24]
+004a81e9: test eax, eax
+004a81eb: jge 0x4a8211
+004a81ed: mov eax, dword ptr [esi + 4]
+004a81f0: push eax
+004a81f1: mov edx, dword ptr [eax]
+004a81f3: call dword ptr [edx + 0x1c]
+004a81f6: cmp eax, 0x8007001e
+004a81fb: je 0x4a81ed
+004a81fd: mov ecx, 0x40
+004a8202: xor eax, eax
+004a8204: mov edi, ebx
+004a8206: rep stosd dword ptr es:[edi], eax
+004a8208: pop edi
+004a8209: pop esi
+004a820a: mov eax, 0x80004005
+004a820f: pop ebx
+004a8210: ret 
+004a8211: pop edi
+004a8212: pop esi
+004a8213: xor eax, eax
+004a8215: pop ebx
+004a8216: ret 
+004a8217: nop 
+004a8218: nop 
+Constants: {'0x52c508': 100.0, '0x52c6c4': 300.0}

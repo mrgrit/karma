@@ -14,3 +14,5 @@ tests/generated-messages.json
 node_modules/
 __pycache__/
 tests/native-eight-*.jsonl
+
+client/Launcher/loot-hint.json
