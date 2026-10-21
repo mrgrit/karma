@@ -16,6 +16,7 @@ namespace KarmaLocal {
     public int Cost { get; private set; }
     public int Budget { get; private set; }
     public string RankName { get; private set; }
+    public bool SelectionValid { get { return apply!=null&&apply.Enabled; } }
 
     sealed class WeaponChoice {
       public int Id, Cost;

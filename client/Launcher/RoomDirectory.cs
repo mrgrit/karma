@@ -12,7 +12,7 @@ using System.Web.Script.Serialization;
 
 namespace KarmaLocal {
   public sealed class RoomEntry {
-    public string RoomId,Code,HostName,MapName,Mode,State,Build;
+    public string RoomId,Code,RoomName,HostName,MapName,Mode,State,Build;
     public int Map,Players,MaxPlayers,GameFee;
     public bool Joinable;
     public bool CanJoin { get { return Joinable&&Build=="karma290-central5"; } }
@@ -29,13 +29,13 @@ namespace KarmaLocal {
     public static RoomEntry Parse(Dictionary<string,object> d){
       if(d==null)throw new InvalidDataException("잘못된 방 정보입니다.");
       object flag;
-      var room=new RoomEntry{RoomId=Text(d,"roomId"),Code=Text(d,"code"),HostName=Text(d,"hostName"),
+      var room=new RoomEntry{RoomId=Text(d,"roomId"),Code=Text(d,"code"),RoomName=Text(d,"roomName"),HostName=Text(d,"hostName"),
         MapName=Text(d,"mapName"),Mode=Text(d,"mode"),State=Text(d,"state"),Build=Text(d,"build"),
         Map=Number(d,"map"),Players=Number(d,"players"),MaxPlayers=Number(d,"maxPlayers"),GameFee=Number(d,"gameFee"),
         Joinable=d.TryGetValue("joinable",out flag)&&flag is bool&&(bool)flag};
       if(room.RoomId.Length<1||room.RoomId.Length>96||room.Code.Length!=6||room.Code.Any(c=>c<'0'||c>'9')||
         room.Map<0||room.Map>255||room.Players<1||room.MaxPlayers<2||room.MaxPlayers>8||room.Players>room.MaxPlayers||
-        !new[]{"dm","tdm","duel"}.Contains(room.Mode)||room.HostName.Length>128||room.MapName.Length>128)
+        !new[]{"dm","tdm","duel"}.Contains(room.Mode)||room.RoomName.Length>64||room.HostName.Length>128||room.MapName.Length>128)
         throw new InvalidDataException("서버에서 잘못된 방 정보를 받았습니다.");
       return room;
     }
@@ -73,9 +73,9 @@ namespace KarmaLocal {
       top.Controls.Add(serverLabel,0,0);top.Controls.Add(refresh,1,0);
       list=new ListView{Dock=DockStyle.Fill,View=View.Details,FullRowSelect=true,MultiSelect=false,HideSelection=false,
         BackColor=Color.FromArgb(25,35,43),ForeColor=ForeColor,BorderStyle=BorderStyle.FixedSingle,HeaderStyle=ColumnHeaderStyle.Nonclickable};
-      foreach(var title in new[]{"방 코드","방장","전장","대전 방식","인원","상태"})list.Columns.Add(title);
-      list.Columns[0].Width=72;list.Columns[1].Width=135;list.Columns[2].Width=135;list.Columns[3].Width=118;list.Columns[4].Width=56;list.Columns[5].Width=155;
-      list.Resize+=(s,e)=>list.Columns[1].Width=Math.Max(100,list.ClientSize.Width-556);
+      foreach(var title in new[]{"방 이름","방장","전장","대전 방식","인원","상태","방 코드"})list.Columns.Add(title);
+      list.Columns[0].Width=180;list.Columns[1].Width=110;list.Columns[2].Width=110;list.Columns[3].Width=118;list.Columns[4].Width=56;list.Columns[5].Width=145;list.Columns[6].Width=72;
+      list.Resize+=(s,e)=>list.Columns[0].Width=Math.Max(140,list.ClientSize.Width-611);
       layout.Controls.Add(list,0,1);
       info=new Label{Dock=DockStyle.Fill,ForeColor=Color.FromArgb(222,181,100),Padding=new Padding(8,12,8,0)};layout.Controls.Add(info,0,2);
       list.SelectedIndexChanged+=(s,e)=>{if(!rendering){UpdateInfo();NotifySelection();}};
@@ -135,8 +135,8 @@ namespace KarmaLocal {
     void Render(){
       var selected=SelectedRoom;string id=selected==null?"":selected.RoomId;
       rendering=true;list.BeginUpdate();list.Items.Clear();
-      foreach(var room in entries.Where(r=>(r.Code+" "+r.HostName+" "+r.MapName+" "+r.ModeName).IndexOf(filter.Trim(),StringComparison.OrdinalIgnoreCase)>=0)){
-        var row=new ListViewItem(new[]{room.Code,room.HostName,room.MapName,room.ModeName,room.Players+" / "+room.MaxPlayers,room.StateName}){Tag=room};
+      foreach(var room in entries.Where(r=>(r.RoomName+" "+r.Code+" "+r.HostName+" "+r.MapName+" "+r.ModeName).IndexOf(filter.Trim(),StringComparison.OrdinalIgnoreCase)>=0)){
+        var row=new ListViewItem(new[]{room.RoomName==""?room.HostName+"의 방":room.RoomName,room.HostName,room.MapName,room.ModeName,room.Players+" / "+room.MaxPlayers,room.StateName,room.Code}){Tag=room};
         if(!room.CanJoin)row.ForeColor=Color.FromArgb(146,158,166);
         list.Items.Add(row);if(room.RoomId==id)row.Selected=true;
       }
@@ -145,7 +145,7 @@ namespace KarmaLocal {
     }
     void UpdateInfo(){
       var room=SelectedRoom;
-      info.Text=room==null?message:room.HostName+"의 방 · "+room.MapName+" · "+room.ModeName+" · "+room.StateName+"\n"+
+      info.Text=room==null?message:(room.RoomName==""?room.HostName+"의 방":room.RoomName)+" · "+room.MapName+" · "+room.ModeName+" · "+room.StateName+"\n"+
         (room.CanJoin?(room.GameFee==100?"대전 참가 시 1 KARMA · 대기실 입장은 무료":"장비 확인 후 참가합니다."):
           room.Build!="karma290-central5"?"방장과 참가자 모두 최신 클라이언트로 실행해 주세요.":"현재 이 방에는 참가할 수 없습니다. 다른 방을 선택하거나 새로고침하세요.");
     }

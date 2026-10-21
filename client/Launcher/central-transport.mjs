@@ -34,7 +34,7 @@ export function writeIdentity(filename,value){
 }
 export async function createCentralPeer({
   role,host='192.168.12.100',port=29020,code,config,maxPlayers=2,mode='duel',
-  secure=true,caFile=defaultCa,manualStart=false,roomId,
+  secure=true,caFile=defaultCa,manualStart=false,roomId,roomName,
   identityPath=identityPathFor(host,port),identity=readIdentity(identityPath),
   onMessage=()=>{},onStatus=()=>{},onProfile=()=>{},onIdentity=()=>{},
 }={}){
@@ -44,7 +44,7 @@ export async function createCentralPeer({
   if(!/^\d{6}$/.test(code))throw TypeError('A six-digit room code is required');
   let resolveReady,rejectReady,closed=false,settled=false,connected=false;
   let effectiveConfig=config,ownId=identity.playerId,remoteId,roomCode=code,peers=[],slot=0,team=0,match={};
-  let buffer=Buffer.alloc(0),pendingState,lastShotKey,flushTimer,welcomed=false;
+  let buffer=Buffer.alloc(0),pendingState,lastShotKey,flushTimer,welcomed=false,pendingEquipment,lastInventory=config.inventory;
   const ready=new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
   // The caller attaches after this asynchronous factory returns.
   ready.catch(()=>{});
@@ -67,7 +67,7 @@ export async function createCentralPeer({
     socket.write(line);return true;
   }
   function flush(){
-    if(!pendingState)return;
+    if(!pendingState||pendingEquipment)return;
     const message=pendingState;pendingState=null;
     write({type:'game',message});
   }
@@ -88,8 +88,14 @@ export async function createCentralPeer({
       report({phase:'listening',code:roomCode,server:host,roomId:message.room?.roomId,...match,players:1});
       return;
     }
-    if(message.type==='waiting'){match={...match,...message};report({phase:'listening',...message,isHost:message.hostId===ownId,server:host});return;}
+    if(message.type==='waiting'){match={...match,...message};report({phase:'listening',...message,localPlayerId:ownId,isHost:message.hostId===ownId,server:host});return;}
     if(message.type==='start-denied'){report({phase:'start-denied',...message,...message.lobby,isHost:message.lobby?.hostId===ownId});return;}
+    if(message.type==='lobby-updated'){
+      if(message.config)effectiveConfig=message.config;
+      if(message.profile)profile(message.profile);
+      report({phase:'lobby-updated',...message});return;
+    }
+    if(message.type==='lobby-update-denied'){report({phase:'lobby-update-denied',...message});return;}
     if(message.type==='profile'){profile(message.profile);return;}
     if(message.type==='peer-ready'){
       if(!welcomed||settled||!Array.isArray(message.peers)||message.peers.length<1||message.peers.length>7||!message.remoteHello)throw Error('잘못된 참가자 목록입니다.');
@@ -112,7 +118,24 @@ export async function createCentralPeer({
       if(message.type==='death-confirmed'&&['karma290-central3','karma290-central4','karma290-central5'].includes(config.settings?.build))onMessage({...message,version:1});
       return;
     }
-    if(INBOUND.has(message.type)){onMessage({...message,version:1});return;}
+    if(INBOUND.has(message.type)){
+      const requestId=message.requestId??message.grant?.requestId??message.grant?.id;
+      if(pendingEquipment&&requestId===pendingEquipment.requestId&&
+        ['drop-grant','drop-denied','pickup-grant','pickup-denied'].includes(message.type)){
+        if(message.type==='drop-grant'&&Array.isArray(message.grant?.inventory))pendingEquipment.approvedInventory=message.grant.inventory;
+        else if(message.type==='pickup-grant'&&Array.isArray(lastInventory)&&Number.isInteger(message.grant?.replaceSlot)){
+          pendingEquipment.approvedInventory=[...lastInventory];pendingEquipment.approvedInventory[message.grant.replaceSlot]=message.grant.weapon;
+        }else pendingEquipment=null;
+      }
+      if(['drop-grant','pickup-grant'].includes(message.type)&&message.grant?.playerId===ownId){
+        // A queued pose predates this inventory transaction. The native adapter
+        // publishes the updated inventory while applying the grant below.
+        pendingState=null;
+      }
+      onMessage({...message,version:1});
+      if(message.type==='drop-denied'||message.type==='pickup-denied')flush();
+      return;
+    }
     if(message.type==='peer-joined'){
       const p=message.peer;
       if(!connected||match.mode!=='dm'||config.settings?.build!=='karma290-central5'||!p||typeof p.playerId!=='string'||p.playerId===ownId||!Number.isInteger(p.slot)||p.slot<0||p.slot>7||![0,1].includes(p.team)||!p.config)throw Error('Invalid joining participant');
@@ -140,7 +163,7 @@ export async function createCentralPeer({
   socket.once(secure?'secureConnect':'connect',()=>{
     report({phase:'connecting',server:host});
     write({type:'hello',version:2,op:role==='host'?'create':'join',code,
-      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,...(roomId?{roomId}:{})});
+      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,...(roomId?{roomId}:{}),...(roomName?{roomName}:{})});
   });
   socket.on('data',chunk=>{
     try{
@@ -160,12 +183,14 @@ export async function createCentralPeer({
   return {
     ready,port,
     startMatch(){return welcomed&&!connected&&!closed?write({type:'start-match',roomId:match.roomId}):false;},
+    updateLobby(update){return welcomed&&!connected&&!closed?write({type:'lobby-update',...update}):false;},
     get connected(){return connected;},get effectiveConfig(){return effectiveConfig;},
     get peers(){return peers;},get slot(){return slot;},get team(){return team;},get match(){return match;},
     get playerId(){return ownId;},get remotePlayerId(){return remoteId;},get code(){return roomCode;},
     send(message){
       if(!connected||closed)return false;
       if(CONTROL.has(message.type)){
+        if(['drop-claim','pickup-claim'].includes(message.type)&&pendingEquipment)return false;
         flush();
         if(message.type==='damage-proof'){
           const proof={...(message.proof||message)};
@@ -173,11 +198,29 @@ export async function createCentralPeer({
           if(proof.attackerId==='self')proof.attackerId=ownId;
           return write({type:'damage-proof',proof});
         }
+        if(message.type==='drop-claim'||message.type==='pickup-claim')pendingEquipment={requestId:message.requestId,life:message.life};
         return write(message);
       }
       const validated=validateLanMessage(message);
       const shotKey=validated.shot?validated.shot.life+':'+validated.shot.id:null;
+      if(pendingEquipment&&['respawn','state'].includes(validated.type)&&validated.life>pendingEquipment.life){pendingEquipment=null;pendingState=null;}
+      if(validated.type==='state'&&pendingEquipment?.approvedInventory){
+        // Native grant handling crosses an asynchronous process boundary. Old
+        // frames already in that queue may arrive even after the server ACK.
+        if(JSON.stringify(validated.inventory)!==JSON.stringify(pendingEquipment.approvedInventory))return true;
+        pendingEquipment=null;
+      }
+      if(Array.isArray(validated.inventory))lastInventory=[...validated.inventory];
+      if(validated.type==='state'&&pendingEquipment){
+        // A grant can race the next frame. Hold its pre-grant inventory until
+        // the result arrives; success discards it, denial flushes it unchanged.
+        if(shotKey===lastShotKey)delete validated.shot;
+        pendingState=validated;return true;
+      }
       if(validated.type==='state'&&(!shotKey||shotKey===lastShotKey)){
+        // Native state retains the last shot until the next shot. Only the
+        // first occurrence is an event; later poses must not fire it again.
+        if(shotKey)delete validated.shot;
         pendingState=validated;return true;
       }
       if(shotKey)lastShotKey=shotKey;

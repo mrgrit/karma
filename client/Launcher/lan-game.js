@@ -224,6 +224,14 @@ function validDropGrant(g){
   !g.inventory.includes(g.weapon)&&new Set(g.inventory.filter(w=>w!==255)).size===g.inventory.filter(w=>w!==255).length;
 }
 function forgetWeapon(w){
+ // localPose repeats the latest shot in ordinary states for delivery. Once
+ // authority removes this gun, that retained payload must stop travelling
+ // with our new inventory. Keep the sequence and live projectile identities:
+ // a shell fired before G may still legitimately hit a victim afterward.
+ if(st.lastShot?.weapon===w){
+  const shot=st.lastShot;st.lastShot=null;
+  send({event:'lan-shot-retired',weapon:w,id:shot.id,life:shot.life,reason:'weapon-dropped'});
+ }
  st.p.add(0x298+56*w).writeS32(0);
  const keys=st.p.add(0x1e60);
  for(let i=0;i<70;i++)if(keys.add(i).readU8()===w)keys.add(i).writeU8(255);

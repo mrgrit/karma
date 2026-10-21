@@ -16,12 +16,14 @@ const options=readJson(settingsPath),runtime=readJson(path.join(support,'runtime
 const multiplayerMaps=readJson(path.join(support,'multiplayer-maps.json')).maps;
 const statusPath=path.join(support,'lan-status.json'),cancelPath=path.join(support,'lan-cancel.json');
 const startPath=path.join(support,'lan-start.json');
+const lobbyCommandPath=path.join(support,'lan-lobby-command.json'),lobbyResultPath=path.join(support,'lan-lobby-result.json');
 const logPath=path.join(support,'last-session.log');
 const lootHintPath=path.join(support,'loot-hint.json');
 try{fs.unlinkSync(lootHintPath);}catch{}
 fs.writeFileSync(logPath,'');
 try{fs.unlinkSync(cancelPath);}catch{}
 try{fs.unlinkSync(startPath);}catch{}
+for(const file of [lobbyCommandPath,lobbyResultPath])try{fs.unlinkSync(file);}catch{}
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
 const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
 let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,connected=false,
@@ -51,6 +53,20 @@ const keepAlive=setInterval(()=>{
     try{const command=readJson(startPath);fs.unlinkSync(startPath);
       if(!connected&&command.roomId===peer?.match?.roomId)peer.startMatch?.();
     }catch(error){log('start-command-error',{message:String(error)});}
+  }
+  if(!closing&&fs.existsSync(lobbyCommandPath)){
+    let command;
+    try{
+      command=readJson(lobbyCommandPath);fs.unlinkSync(lobbyCommandPath);
+      if(!/^[a-f0-9]{32}$/i.test(command.requestId||''))throw Error('잘못된 대기실 요청입니다.');
+      const update={requestId:command.requestId};
+      if(typeof command.ready==='boolean')update.ready=command.ready;
+      if(command.config)update.config={...command.config,character:characterConfig(command.config.character),settings:{build:'karma290-central5',mode:1}};
+      if(connected||command.roomId!==peer?.match?.roomId||!peer.updateLobby?.(update))throw Error('이미 대전이 시작됐거나 대기실 연결이 종료되었습니다.');
+    }catch(error){
+      fs.writeFileSync(lobbyResultPath,JSON.stringify({requestId:command?.requestId,ok:false,message:error.message}));
+      log('lobby-command-error',{message:String(error)});
+    }
   }
 },200);
 const openMenu=message=>{
@@ -93,14 +109,17 @@ try{
   status('connecting',options.role==='host'?'방을 준비하고 있습니다.':'방에 접속하고 있습니다.');
   peer=await (central?createCentralPeer:createLanPeer)({
     role:options.role,host:options.host,port:options.port||29020,code:String(options.code),config,
-    maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',manualStart:central,roomId:options.roomId,
+    maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',manualStart:central,roomId:options.roomId,roomName:options.roomName,
     onStatus:detail=>{
       log('lan-status',detail);
       const phase=detail.phase||detail.type||detail.status;
+      if(phase==='lobby-updated'||phase==='lobby-update-denied'){
+        fs.writeFileSync(lobbyResultPath,JSON.stringify({requestId:detail.requestId,ok:phase==='lobby-updated',message:detail.message||'',ready:detail.ready,config:detail.config}));
+      }
       if(phase==='listening'||phase==='start-denied')status('waiting',phase==='start-denied'?detail.message:
         '코드 '+(detail.code||options.code)+' · '+(detail.players||1)+' / '+(detail.maxPlayers||options.maxPlayers||2)+'명 · '+
-        (detail.manualStart?(detail.isHost?'방장이 시작 버튼을 누르면 출전합니다.':'방장이 시작하기를 기다립니다.'):'정원이 모이면 자동 시작합니다.'),
-        {roomId:detail.roomId,code:detail.code||options.code,players:detail.players||1,maxPlayers:detail.maxPlayers||options.maxPlayers||2,
+        (detail.manualStart?'장비 설정 후 준비 완료를 누르세요.':'정원이 모이면 자동 시작합니다.'),
+        {roomId:detail.roomId,roomName:detail.roomName||options.roomName,localPlayerId:detail.localPlayerId||peer?.playerId,code:detail.code||options.code,players:detail.players||1,maxPlayers:detail.maxPlayers||options.maxPlayers||2,
           mode:detail.mode||options.matchMode,hostId:detail.hostId,isHost:detail.isHost??(options.role==='host'),manualStart:detail.manualStart===true,
           canStart:detail.canStart===true,startReason:detail.startReason||'',members:detail.members||[],gameFee:detail.gameFee||0});
       if(phase==='round-ended')status('playing','라운드 '+detail.round+' 종료 · '+detail.roundWins.join(' : ')+' · 다음 라운드 준비');

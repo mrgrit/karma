@@ -132,7 +132,11 @@ async function kill(shooter,victim){
 }
 try{
  const a=await connect(0),b=await connect(1);
- await wait('two players waiting',()=>server.stats().players===2);await delay(300);assert(a.peer.startMatch());
+ await wait('two players waiting',()=>server.stats().players===2&&a.peer.match.members?.length===2);
+ assert.equal(a.peer.match.canStart,false,'New arrivals reserve unready seats');
+ for(const c of [a,b])assert(c.peer.updateLobby({requestId:crypto.randomUUID(),ready:true}));
+ await wait('all participants explicitly ready',()=>a.peer.match.canStart===true);
+ assert(a.peer.startMatch());
  await Promise.all([launch(a),launch(b)]);let all=await allPeers(2);
  const stableIndex=all[0].peers.find(p=>p.id===b.peer.playerId).index;
  await kill(a,b);log('initial-native-kill',{scores:await states()});

@@ -85,10 +85,15 @@ try{
   if(dual){const response=await fetch(`http://127.0.0.1:${server.healthPort}/api/admin/users/${account.playerId}`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({xp:startingXp})});assert.equal(response.status,200);}
   const c={i,role:i===0?'host':'join',events:[],pending:[]};clients.push(c);
   c.peer=await createCentralPeer({role:c.role,host:'127.0.0.1',port:server.port,secure:false,identityPath:null,
-   identity:{authToken:token},code:'888123',config,maxPlayers:8,mode,
+   identity:{authToken:token},code:'888123',config,maxPlayers:8,mode,manualStart:true,
    onStatus:x=>log('transport',{client:i,...x}),onProfile:x=>{c.profile=x;},
    onMessage:x=>{if(stopping)return;if(c.loaded)c.script.exports.lanreceive(x).catch(e=>{if(!stopping)failure=e;});else c.pending.push(x);}});
  }
+ await wait('eight unready lobby seats',()=>clients[0].peer.match.members?.length===8);
+ assert.equal(clients[0].peer.match.canStart,false);
+ for(const c of clients)assert(c.peer.updateLobby({requestId:crypto.randomUUID(),ready:true}));
+ await wait('eight ready participants',()=>clients[0].peer.match.canStart===true);
+ assert(clients[0].peer.startMatch());
  await Promise.all(clients.map(async c=>{c.hello=await c.peer.ready;}));
  for(const c of clients){
   const exe=path.join(game,'KarmaAIProbe.exe');c.pid=await device.spawn([exe],{cwd:game});c.session=await device.attach(c.pid);
