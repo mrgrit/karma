@@ -203,7 +203,7 @@ namespace KarmaLocal {
       header.Controls.Add(Wrapped(RoleDescription(TextOf(characterData,"role")),9,muted));
       var dual=Dict(Dict(data,"constraints"),"dualCannon");
       if(dual!=null&&TextOf(characterData,"role")==TextOf(dual,"role","heavy")){
-        int needed=Number(dual,"minXp",600);
+        int needed=Number(dual,"minXp",6000);
         header.Controls.Add(Wrapped("쌍포 · "+RankAt(needed)+" (XP "+needed.ToString("N0")+")부터: "+
           "판져파우스트 + 바주카포. 가벼운 자동화기 1정과 쌍안경만 추가할 수 있습니다.",9,accent));
       }
@@ -230,7 +230,7 @@ namespace KarmaLocal {
         var all=new HashSet<int>(IntArray(s,"allowedIds"));
         int[] permitted=permissions!=null&&permissions.ContainsKey(key)?IntArray(permissions,key):all.ToArray();
         var allowed=new HashSet<int>(permitted.Where(id=>all.Contains(id)&&weapons.ContainsKey(id)));
-        if(key=="pistol"&&dual!=null&&userXp<Number(dual,"minXp",600))
+        if(key=="pistol"&&dual!=null&&userXp<Number(dual,"minXp",6000))
           allowed.ExceptWith(IntArray(dual,"cannonIds"));
         bool optional=Flag(s,"optional")||optionalSlots.Contains(key);if(optional)allowed.Add(emptyId);
         int defaultId=defaultsByCharacter.Length==7?defaultsByCharacter[i]:Number(s,"defaultId",-1);
@@ -275,7 +275,7 @@ namespace KarmaLocal {
       var defaults=MakeButton("기본 장비");
       buttons.Controls.Add(apply);buttons.Controls.Add(cancel);buttons.Controls.Add(defaults);
       if(dual!=null&&TextOf(characterData,"role")==TextOf(dual,"role","heavy")){
-        int needed=Number(dual,"minXp",600);
+        int needed=Number(dual,"minXp",6000);
         var twin=MakeButton(userXp>=needed?"쌍포 구성":"쌍포 · "+RankAt(needed)+"부터");
         twin.Enabled=userXp>=needed;buttons.Controls.Add(twin);
         tips.SetToolTip(twin,"두 포와 가벼운 자동화기로 구성하고, 방어·회복·수류탄과 권총을 비웁니다.");
@@ -351,7 +351,7 @@ namespace KarmaLocal {
     void ApplyDualPreset(Dictionary<string,object> dual){
       var cannonIds=IntArray(dual,"cannonIds");
       var preset=IntArray(dual,"defaultInventory");
-      if(cannonIds.Length!=2||preset.Length!=7||userXp<Number(dual,"minXp",600))return;
+      if(cannonIds.Length!=2||preset.Length!=7||userXp<Number(dual,"minXp",6000))return;
       if(rows.Any(row=>!row.Allowed.Contains(preset[row.Index])))return;
       updating=true;
       foreach(var row in rows)row.Picker.SelectedItem=weapons[preset[row.Index]];
@@ -420,7 +420,7 @@ namespace KarmaLocal {
         if(auxiliary!=null&&cannons.Contains(Inventory[auxiliary.Index])&&cannonCount!=2)
           problems.Add("보조포 슬롯은 쌍포 전용입니다. 특수무기에도 다른 로켓포를 장착하거나 보조포를 비워 주세요.");
         if(cannonCount>1){
-          int requiredXp=Number(dual,"minXp",600);
+          int requiredXp=Number(dual,"minXp",6000);
           if(TextOf(characterData,"role")!=TextOf(dual,"role","heavy")||userXp<requiredXp)
             problems.Add("쌍포는 중화기 병과 "+RankAt(requiredXp)+" (XP "+requiredXp.ToString("N0")+")부터 사용할 수 있습니다.");
           if(cannonCount>Number(dual,"maxCannons",2))problems.Add("로켓포는 최대 두 개까지 장착할 수 있습니다.");

@@ -185,7 +185,7 @@ try{
     central,localPlayerId:peer.playerId,remotePlayerId:peer.remotePlayerId,
     peers:central?peer.peers:undefined,slot:peer.slot,team:peer.team,match:peer.match};
   let source='globalThis.KARMA_LAN_CONFIG='+JSON.stringify(lanConfig)+';\n';
-  for(const file of ['startup-diagnostics.js','legacy-controls.js','input-lan.js','offline-death.js','window-size.js','lan-game.js','rank-display.js'])
+  for(const file of ['startup-diagnostics.js','legacy-controls.js','input-lan.js','native-font.js','offline-death.js','window-size.js','lan-game.js','rank-display.js','player-names.js'])
     source+='\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
   source+='\nrpc.exports.compatibilitystatus=()=>({ready:true});';
   script=await session.createScript(source);checkClosing();

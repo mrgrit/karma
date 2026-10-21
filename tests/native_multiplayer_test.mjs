@@ -60,7 +60,7 @@ const log=(event,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const clients=[];let failure=null,stopping=false;
 const character={index:dual?4:0,camp:0,model:dual?'cpom_020.chr':'cpom_050.chr',name:'Player'};
-const startingXp=dual?600:0,blastWeapon=dual?21:6;
+const startingXp=dual?6000:0,blastWeapon=dual?21:6;
 const config={map:mapIndex,age:0,character,inventory:dual?[50,9,21,22,255,255,255]:[50,9,1,6,48,24,18],selectedWeapon:9,settings:{build:'karma290-central4',mode:1}};
 async function wait(label,predicate,timeout=20000){
  const deadline=Date.now()+timeout;

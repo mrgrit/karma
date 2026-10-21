@@ -60,7 +60,7 @@ const log=(event,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const clients=[];let failure=null,stopping=false;
 const character={index:dual?4:0,camp:0,model:dual?'cpom_020.chr':'cpom_050.chr',name:'Player'};
-const startingXp=dual?600:0,blastWeapon=dual?21:6;
+const startingXp=dual?6000:0,blastWeapon=dual?21:6;
 const config={map:mapIndex,age:0,character,inventory:dual?[50,9,21,22,255,255,255]:[50,9,1,6,48,24,18],selectedWeapon:9,settings:{build:'karma290-central5',mode:1}};
 async function wait(label,predicate,timeout=20000){
  const deadline=Date.now()+timeout;
@@ -85,7 +85,7 @@ const chars=[4,4];
 async function connect(i,reuse){
  const account=reuse?.account||await server.auth.createAccount({email:`dmjoin${i}@native.invalid`,password:crypto.randomUUID(),name:'Late '+i,role:'admin'});
  const token=server.auth.issueSession(account).authToken;
- const response=await fetch(`http://127.0.0.1:${server.healthPort}/api/admin/users/${account.playerId}`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({xp:100})});assert.equal(response.status,200);
+ const response=await fetch(`http://127.0.0.1:${server.healthPort}/api/admin/users/${account.playerId}`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({xp:1000})});assert.equal(response.status,200);
  const c={i,account,role:i===0?'host':'join',events:[],pending:[]};clients.push(c);
  const offered={map:mapIndex,age:0,inventory:[50,14,1,21,48,24,19],selectedWeapon:21,character:{index:chars[i],camp:0,model:models[i],name:'Late '+i},settings:{build:'karma290-central5',mode:1}};
  c.peer=await createCentralPeer({role:c.role,host:'127.0.0.1',port:server.port,secure:false,identityPath:null,

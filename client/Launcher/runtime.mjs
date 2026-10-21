@@ -45,7 +45,7 @@ try {
   const moduleSource=file=>'\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
   let accountProfile={};
   try{accountProfile=JSON.parse(fs.readFileSync(path.join(support,'central-profile.json'),'utf8').replace(/^\uFEFF/,''));}catch{}
-  let source='globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\nglobalThis.KARMA_ACCOUNT_PROFILE='+JSON.stringify({rank:accountProfile.rank})+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('legacy-controls.js')+moduleSource('input-menu.js');
+  let source='globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\nglobalThis.KARMA_ACCOUNT_PROFILE='+JSON.stringify({rank:accountProfile.rank,name:accountProfile.name})+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('legacy-controls.js')+moduleSource('input-menu.js')+moduleSource('native-font.js');
   source+=moduleSource('offline-death.js');
   source+=moduleSource('practice-end.js');
   source+=moduleSource('window-size.js');
@@ -54,6 +54,7 @@ try {
     source+=moduleSource('ai.js');
   }
   source+=moduleSource('rank-display.js');
+  source+=moduleSource('player-names.js');
   // An uncaught initialization error in a Frida script is reported as a
   // message, not necessarily a rejected load(). Reach this marker before
   // allowing the suspended game to run without its input compatibility code.

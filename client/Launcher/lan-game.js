@@ -547,8 +547,10 @@ function seedPeer(g,m,peer){
  }
  const inventory=(i===1?cfg.remoteInventory:null)||c.inventory;
  if(Array.isArray(inventory)&&inventory.length===7&&inventory.every(v=>integer(v,0,51)||v===255))g.add(0x12e+i*7).writeByteArray(inventory);
- const name=String(c.name||character.name||'Player '+(peer.slot??i)).replace(/[^ -~]/g,'').slice(0,63)||'Player '+i;
- g.add(0x166+i*0x100).writeByteArray(new Uint8Array(0x100));g.add(0x166+i*0x100).writeUtf8String(name);g.add(0x990+i*4).writeS32(0);
+ const name=String(character.name||c.name||'Player '+(peer.slot??i));
+ if(globalThis.KARMA_WRITE_PLAYER_NAME)globalThis.KARMA_WRITE_PLAYER_NAME(g.add(0x166+i*0x100),name);
+ else {g.add(0x166+i*0x100).writeByteArray(new Uint8Array(0x100));g.add(0x166+i*0x100).writeUtf8String(name.replace(/[^ -~]/g,'').slice(0,63)||'Player '+i);}
+ g.add(0x990+i*4).writeS32(0);
  g.add(0xad0+i*0x98).writeByteArray(new Uint8Array(0x98));g.add(0xf90+i*0x98).writeByteArray(new Uint8Array(0x98));
  g.add(0xab0+i*4).writeS32(0);g.add(0x9b0+i*32).writeByteArray(new Uint8Array(32));g.add(0x1450+i).writeU8(0);
  globalThis.KARMA_SET_PEER_RANK?.(i,c.rank);

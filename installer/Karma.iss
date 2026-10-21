@@ -5,7 +5,7 @@
 #ifndef ReleaseOutput
   #error ReleaseOutput is required
 #endif
-#define BuildVersion "0.5.1"
+#define BuildVersion "0.5.2"
 [Setup]
 AppId={{F12FC742-9B07-4567-84AB-17B61AB2DDB2}
 AppName=카르마 LAN
