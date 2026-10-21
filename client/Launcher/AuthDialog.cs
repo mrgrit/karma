@@ -88,7 +88,7 @@ namespace KarmaLocal {
       signupName=Field(signup,"게임에서 사용할 이름 (1~32자)",false,32);
       signupEmail=Field(signup,"이메일",false,254);
       signupPassword=Field(signup,"비밀번호 (8~128자)",true,128);
-      signup.Controls.Add(TextLabel("이메일은 로그인에 사용됩니다."));
+      signup.Controls.Add(TextLabel("이메일은 로그인에 사용됩니다. 관리자 승인 후 게임과 거래소를 이용할 수 있습니다."));
       verificationPanel=new Panel{Dock=DockStyle.Top,AutoSize=true,Visible=false,Margin=Padding.Empty};
       var verification=FormGrid(verificationPanel);verification.Padding=Padding.Empty;
       verificationCode=Field(verification,"이메일 인증번호 (숫자 6자리)",false,6);
@@ -150,7 +150,7 @@ namespace KarmaLocal {
       if(accountMode){action.Enabled=!busy;return;}
       tabs.Enabled=!busy;
       bool verifying=tabs.SelectedIndex==1&&pending;
-      action.Text=tabs.SelectedIndex==0?"로그인":verifying?"인증 완료 · 가입":"가입하기";
+      action.Text=tabs.SelectedIndex==0?"로그인":verifying?"인증 완료 · 가입 신청":"가입 신청";
       action.Enabled=!busy&&(!verifying||
         (DateTime.UtcNow<expiresAt&&verificationCode.Text.Length==6&&verificationCode.Text.All(c=>c>='0'&&c<='9')));
       verificationPanel.Visible=pending;
@@ -179,6 +179,7 @@ namespace KarmaLocal {
         var response=await Send(new Dictionary<string,object>{{"operation","request"},
           {"email",Email(signupEmail)},{"password",Password(signupPassword)},{"displayName",name}});
         RequireSuccess(response);
+        if(Flag(response,"approvalRequired")){ShowApprovalPending(response);return;}
         if(!Flag(response,"requiresVerification",true)&&Dict(response,"profile")!=null){
           CompleteAuthentication(response);return;
         }
@@ -195,8 +196,15 @@ namespace KarmaLocal {
         if(code.Length!=6||code.Any(c=>c<'0'||c>'9'))throw new InvalidOperationException("숫자 6자리 인증번호를 입력해 주세요.");
         var response=await Send(new Dictionary<string,object>{{"operation","verify"},
           {"email",Email(signupEmail)},{"code",code}});
-        RequireSuccess(response);CompleteAuthentication(response);
+        RequireSuccess(response);
+        if(Flag(response,"approvalRequired")){ShowApprovalPending(response);return;}
+        CompleteAuthentication(response);
       },"인증번호를 확인하고 있습니다…");
+    }
+    void ShowApprovalPending(Dictionary<string,object> response) {
+      loginEmail.Text=signupEmail.Text;pending=false;SetRegistrationReadOnly(false);
+      verificationCode.Clear();ClearPasswords();tabs.SelectedIndex=0;
+      status.ForeColor=muted;status.Text=Value(response,"message","가입 신청이 접수되었습니다. 관리자 승인 후 로그인해 주세요.");
     }
     void RequireSuccess(Dictionary<string,object> response) {
       if(Flag(response,"ok"))return;

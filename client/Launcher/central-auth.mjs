@@ -38,6 +38,7 @@ try{
     reply({ok:true,requiresVerification:false,profile:result.profile});
   }else if(result.ok){
     reply({ok:true,requiresVerification:result.requiresVerification!==false,
+      approvalRequired:result.approvalRequired===true,approvalStatus:result.approvalStatus,
       expiresIn:result.expiresIn,resendAfter:result.resendAfter,message:result.message});
   }else{
     reply({ok:false,code:result.error?.code||'AUTH_FAILED',message:result.error?.message||'로그인할 수 없습니다.'});
