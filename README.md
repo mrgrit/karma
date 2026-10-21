@@ -4,7 +4,7 @@ Karma290 원본 게임에 Windows 실행기, 입력 호환성 수정, 최대 8�
 
 ## 설치와 실행
 
-1. [Releases](https://github.com/mrgrit/karma/releases)의 **Karma-LAN-Setup-v0.4.0.exe**를 받습니다.
+1. [Releases](https://github.com/mrgrit/karma/releases)의 **Karma-LAN-Setup-v0.4.1.exe**를 받습니다.
 2. 설치 파일을 실행하고 **설치**를 누릅니다. 게임과 런타임이 사용자 폴더에 함께 설치되며 바탕화면과 시작 메뉴에 바로가기가 생깁니다.
 3. 바탕화면의 **카르마 LAN**을 실행합니다. REA나 Node를 따로 설치할 필요는 없습니다. 업데이트 설치 시 기존 개인 설정과 로그인 정보는 유지됩니다. 포터블 사용자는 ZIP 전체를 압축 해제하세요.
 4. `로그인/계정`에서 회원가입 또는 로그인합니다. 현재 이메일 인증은 생략하며, 가입 신청 후 관리자가 승인해야 로그인할 수 있습니다.

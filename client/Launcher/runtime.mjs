@@ -43,7 +43,9 @@ try {
     profile=Object.fromEntries(Object.entries(saved).filter(([key,value])=>key.length<40&&typeof value==='number'&&Number.isFinite(value)));
   }catch{}
   const moduleSource=file=>'\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
-  let source='globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('input-menu.js');
+  let accountProfile={};
+  try{accountProfile=JSON.parse(fs.readFileSync(path.join(support,'central-profile.json'),'utf8').replace(/^\uFEFF/,''));}catch{}
+  let source='globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\nglobalThis.KARMA_ACCOUNT_PROFILE='+JSON.stringify({rank:accountProfile.rank})+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('legacy-controls.js')+moduleSource('input-menu.js');
   source+=moduleSource('offline-death.js');
   source+=moduleSource('practice-end.js');
   source+=moduleSource('window-size.js');
@@ -51,6 +53,7 @@ try {
     if(!config.aiReady)throw new Error('AI mode is not available');
     source+=moduleSource('ai.js');
   }
+  source+=moduleSource('rank-display.js');
   // An uncaught initialization error in a Frida script is reported as a
   // message, not necessarily a rejected load(). Reach this marker before
   // allowing the suspended game to run without its input compatibility code.

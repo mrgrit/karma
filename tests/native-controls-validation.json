@@ -1,0 +1,135 @@
+{
+  "originalExecutableSha256": "aa824dda4d48c0304de3e9ab1c6012c542dc280eca93a6d507da9a21c4bbedab",
+  "runs": {
+    "baseline": [
+      {
+        "time": "2026-10-21T03:45:01.725Z",
+        "event": "baseline-reproduced",
+        "exception": {
+          "event": "native-exception",
+          "type": "access-violation",
+          "address": "0x419810",
+          "memory": {
+            "operation": "read",
+            "address": "0x113e"
+          }
+        }
+      }
+    ],
+    "fixed": [
+      {
+        "time": "2026-10-21T03:45:37.868Z",
+        "event": "PASS",
+        "tQueries": 58,
+        "rankTests": [
+          {
+            "id": "recruit",
+            "expected": 0,
+            "count": 94,
+            "queries": 58,
+            "backend": "0x0",
+            "rank": 0,
+            "scoreboardRank": 0
+          },
+          {
+            "id": "private",
+            "expected": 1,
+            "count": 99,
+            "queries": 58,
+            "backend": "0x0",
+            "rank": 1,
+            "scoreboardRank": 1
+          },
+          {
+            "id": "corporal",
+            "expected": 3,
+            "count": 104,
+            "queries": 58,
+            "backend": "0x0",
+            "rank": 3,
+            "scoreboardRank": 3
+          },
+          {
+            "id": "sergeant",
+            "expected": 4,
+            "count": 109,
+            "queries": 58,
+            "backend": "0x0",
+            "rank": 4,
+            "scoreboardRank": 4
+          },
+          {
+            "id": "lieutenant",
+            "expected": 8,
+            "count": 114,
+            "queries": 58,
+            "backend": "0x0",
+            "rank": 8,
+            "scoreboardRank": 8
+          }
+        ],
+        "isolated": true
+      }
+    ],
+    "fixed-lan": [
+      {
+        "time": "2026-10-21T03:50:39.426Z",
+        "event": "PASS",
+        "tQueries": 59,
+        "rankTests": [
+          {
+            "id": "recruit",
+            "expected": 0,
+            "count": 94,
+            "queries": 59,
+            "backend": "0x0",
+            "rank": 0,
+            "scoreboardRank": 0,
+            "remoteRank": 1
+          },
+          {
+            "id": "private",
+            "expected": 1,
+            "count": 99,
+            "queries": 59,
+            "backend": "0x0",
+            "rank": 1,
+            "scoreboardRank": 1,
+            "remoteRank": 1
+          },
+          {
+            "id": "corporal",
+            "expected": 3,
+            "count": 104,
+            "queries": 59,
+            "backend": "0x0",
+            "rank": 3,
+            "scoreboardRank": 3,
+            "remoteRank": 1
+          },
+          {
+            "id": "sergeant",
+            "expected": 4,
+            "count": 108,
+            "queries": 59,
+            "backend": "0x0",
+            "rank": 4,
+            "scoreboardRank": 4,
+            "remoteRank": 1
+          },
+          {
+            "id": "lieutenant",
+            "expected": 8,
+            "count": 114,
+            "queries": 59,
+            "backend": "0x0",
+            "rank": 8,
+            "scoreboardRank": 8,
+            "remoteRank": 1
+          }
+        ],
+        "isolated": true
+      }
+    ]
+  }
+}

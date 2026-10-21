@@ -23,7 +23,7 @@ try{fs.unlinkSync(startPath);}catch{}
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
 const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
 let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,connected=false,
-  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud;
+  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud,accountProfile={};
 const checkClosing=()=>{if(closing)throw Error('LAN 대전이 취소되었습니다.');};
 const cleanMenu=()=>{
   clearInterval(pauseTimer);pauseTimer=null;
@@ -111,7 +111,13 @@ try{
       }
       if(phase==='disconnected'&&connected&&!closing)stop('상대와의 연결이 끊겨 대전을 종료했습니다.',true);
     },
-    onProfile:profile=>fs.writeFileSync(path.join(support,'central-profile.json'),JSON.stringify(profile)),
+    onProfile:profile=>{
+      accountProfile=profile;
+      fs.writeFileSync(path.join(support,'central-profile.json'),JSON.stringify(profile));
+      if(rpcReady&&!closing&&profile.rank)script.exports.accountrank(profile.rank).catch(error=>{
+        if(!ended&&!closing)log('rank-update-warning',{message:String(error)});
+      });
+    },
     onMessage:message=>{
       if(closing)return;
       if(message.type==='leave'){stop('상대가 방을 나갔습니다.');return;}
@@ -133,7 +139,7 @@ try{
   if(closing){peer.close();checkClosing();}
   const remoteHello=await peer.ready;
   checkClosing();connected=true;
-  if(central)config=peer.effectiveConfig;
+  if(central)config={...peer.effectiveConfig,rank:accountProfile.rank};
   if(remoteHello.config.map!==config.map||remoteHello.config.age!==0||!multiplayerMaps.some(map=>map.mapIndex===config.map)||
      remoteHello.config.settings?.build!==config.settings.build)throw Error('서로 같은 LAN 수정본과 전장을 사용해야 합니다.');
   const remoteCharacter=characterConfig(remoteHello.config.character);
@@ -155,7 +161,7 @@ try{
     central,localPlayerId:peer.playerId,remotePlayerId:peer.remotePlayerId,
     peers:central?peer.peers:undefined,slot:peer.slot,team:peer.team,match:peer.match};
   let source='globalThis.KARMA_LAN_CONFIG='+JSON.stringify(lanConfig)+';\n';
-  for(const file of ['startup-diagnostics.js','input-lan.js','offline-death.js','window-size.js','lan-game.js'])
+  for(const file of ['startup-diagnostics.js','legacy-controls.js','input-lan.js','offline-death.js','window-size.js','lan-game.js','rank-display.js'])
     source+='\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
   source+='\nrpc.exports.compatibilitystatus=()=>({ready:true});';
   script=await session.createScript(source);checkClosing();
