@@ -6,6 +6,7 @@ client/Launcher/playstyle.json
 client/Launcher/lan-config-*.json
 client/Launcher/lan-status.json
 client/Launcher/lan-cancel.json
+client/Launcher/lan-start.json*
 client/Launcher/pause-*.json
 *.log
 *.zip

@@ -34,7 +34,7 @@ export function writeIdentity(filename,value){
 }
 export async function createCentralPeer({
   role,host='192.168.12.100',port=29020,code,config,maxPlayers=2,mode='duel',
-  secure=true,caFile=defaultCa,
+  secure=true,caFile=defaultCa,manualStart=false,
   identityPath=identityPathFor(host,port),identity=readIdentity(identityPath),
   onMessage=()=>{},onStatus=()=>{},onProfile=()=>{},onIdentity=()=>{},
 }={}){
@@ -88,7 +88,8 @@ export async function createCentralPeer({
       report({phase:'listening',code:roomCode,server:host,roomId:message.room?.roomId,...match,players:1});
       return;
     }
-    if(message.type==='waiting'){report({phase:'listening',...message,server:host});return;}
+    if(message.type==='waiting'){match={...match,...message};report({phase:'listening',...message,isHost:message.hostId===ownId,server:host});return;}
+    if(message.type==='start-denied'){report({phase:'start-denied',...message,...message.lobby,isHost:message.lobby?.hostId===ownId});return;}
     if(message.type==='profile'){profile(message.profile);return;}
     if(message.type==='peer-ready'){
       if(!welcomed||settled||!Array.isArray(message.peers)||message.peers.length<1||message.peers.length>7||!message.remoteHello)throw Error('잘못된 참가자 목록입니다.');
@@ -124,7 +125,7 @@ export async function createCentralPeer({
   socket.once(secure?'secureConnect':'connect',()=>{
     report({phase:'connecting',server:host});
     write({type:'hello',version:2,op:role==='host'?'create':'join',code,
-      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode});
+      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart});
   });
   socket.on('data',chunk=>{
     try{
@@ -143,6 +144,7 @@ export async function createCentralPeer({
   socket.on('close',()=>{if(!closed)fail(Error('LAN 서버와의 연결이 끊겼습니다.'));});
   return {
     ready,port,
+    startMatch(){return welcomed&&!connected&&!closed?write({type:'start-match',roomId:match.roomId}):false;},
     get connected(){return connected;},get effectiveConfig(){return effectiveConfig;},
     get peers(){return peers;},get slot(){return slot;},get team(){return team;},get match(){return match;},
     get playerId(){return ownId;},get remotePlayerId(){return remoteId;},get code(){return roomCode;},

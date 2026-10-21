@@ -13,11 +13,13 @@ if(path.dirname(settingsPath).toLowerCase()!==support.toLowerCase()||
    !/^lan-config-[a-z0-9-]+\.json$/i.test(path.basename(settingsPath)))throw Error('Invalid LAN configuration path');
 const options=readJson(settingsPath),runtime=readJson(path.join(support,'runtime.json'));
 const statusPath=path.join(support,'lan-status.json'),cancelPath=path.join(support,'lan-cancel.json');
+const startPath=path.join(support,'lan-start.json');
 const logPath=path.join(support,'last-session.log');
 fs.writeFileSync(logPath,'');
 try{fs.unlinkSync(cancelPath);}catch{}
+try{fs.unlinkSync(startPath);}catch{}
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
-const status=(phase,message)=>fs.writeFileSync(statusPath,JSON.stringify({phase,message,time:new Date().toISOString()}));
+const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
 let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,connected=false,
   failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer;
 const checkClosing=()=>{if(closing)throw Error('LAN 대전이 취소되었습니다.');};
@@ -40,6 +42,11 @@ const stop=async(reason,error=false)=>{
 const keepAlive=setInterval(()=>{
   if(ended){clearInterval(keepAlive);return;}
   if(fs.existsSync(cancelPath))stop('LAN 대전을 종료했습니다.');
+  if(!closing&&fs.existsSync(startPath)){
+    try{const command=readJson(startPath);fs.unlinkSync(startPath);
+      if(!connected&&command.roomId===peer?.match?.roomId)peer.startMatch?.();
+    }catch(error){log('start-command-error',{message:String(error)});}
+  }
 },200);
 const openMenu=message=>{
   if(pauseChild||!/^0x[0-9a-f]+$/i.test(message.hwnd||''))return;
@@ -80,11 +87,16 @@ try{
   status('connecting',options.role==='host'?'방을 준비하고 있습니다.':'방에 접속하고 있습니다.');
   peer=await (central?createCentralPeer:createLanPeer)({
     role:options.role,host:options.host,port:options.port||29020,code:String(options.code),config,
-    maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',
+    maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',manualStart:central,
     onStatus:detail=>{
       log('lan-status',detail);
       const phase=detail.phase||detail.type||detail.status;
-      if(phase==='listening')status('waiting','방 열림 · 코드 '+(detail.code||options.code)+' · '+(detail.players||1)+' / '+(detail.maxPlayers||options.maxPlayers||2)+'명 참가 대기');
+      if(phase==='listening'||phase==='start-denied')status('waiting',phase==='start-denied'?detail.message:
+        '코드 '+(detail.code||options.code)+' · '+(detail.players||1)+' / '+(detail.maxPlayers||options.maxPlayers||2)+'명 · '+
+        (detail.manualStart?(detail.isHost?'방장이 시작 버튼을 누르면 출전합니다.':'방장이 시작하기를 기다립니다.'):'정원이 모이면 자동 시작합니다.'),
+        {roomId:detail.roomId,code:detail.code||options.code,players:detail.players||1,maxPlayers:detail.maxPlayers||options.maxPlayers||2,
+          mode:detail.mode||options.matchMode,hostId:detail.hostId,isHost:detail.isHost??(options.role==='host'),manualStart:detail.manualStart===true,
+          canStart:detail.canStart===true,startReason:detail.startReason||'',members:detail.members||[]});
       if(phase==='round-ended')status('playing','라운드 '+detail.round+' 종료 · '+detail.roundWins.join(' : ')+' · 다음 라운드 준비');
       if(phase==='round-start')status('playing','라운드 '+detail.round+' · 한 팀 전멸 시 종료 · F10 메뉴');
       if(phase==='match-ended'){
@@ -157,7 +169,7 @@ try{
     if(payload.event==='offline-player-death')status('playing',peer.match?.mode==='tdm'?'전사 · 팀전은 다음 라운드에 다시 등장합니다.':peer.match?.mode==='dm'?'전사 · 10초 후 랜덤 위치에서 다시 등장합니다.':'전사 · 잠시 후 다시 등장합니다.');
     if(payload.event==='lan-local-respawn')status('playing','재등장 · Tab 점수판 · F10 메뉴 · Esc 종료');
     if(payload.kind==='exit-requested')stop('LAN 대전을 종료했습니다.');
-    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 4:4 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료');}
+    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료');}
     if(payload.kind==='pause-requested')openMenu(payload);
   });
   const done=new Promise(resolve=>session.detached.connect((reason,crash)=>{

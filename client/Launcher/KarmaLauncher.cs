@@ -88,15 +88,15 @@ namespace KarmaLocal {
         MaxLength=6,Width=190,Margin=new Padding(0,0,0,16)};
       panel.Controls.Add(code);
       var matchMode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Top,Margin=new Padding(0,0,0,12)};
-      matchMode.Items.AddRange(new object[]{"1:1 대전 (2명)","4:4 팀전 (8명 · 전멸전)","개인 데스매치 (2~8명)"});matchMode.SelectedIndex=0;
+      matchMode.Items.AddRange(new object[]{"1:1 대전 (2명)","팀전 (최대 4:4 · 전멸전)","개인 데스매치 (2~8명)"});matchMode.SelectedIndex=0;
       var capacity=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Width=180,Margin=new Padding(0,0,0,16)};
       capacity.Items.AddRange(new object[]{2,3,4,5,6,7,8});capacity.SelectedIndex=6;capacity.Enabled=false;
       if(host){
         panel.Controls.Add(new Label{Text="대전 방식",AutoSize=true});panel.Controls.Add(matchMode);
-        panel.Controls.Add(new Label{Text="개인전 참가 인원",AutoSize=true});panel.Controls.Add(capacity);
+        panel.Controls.Add(new Label{Text="개인전 최대 인원",AutoSize=true});panel.Controls.Add(capacity);
       }
       matchMode.SelectedIndexChanged+=(s,e)=>{capacity.Enabled=matchMode.SelectedIndex==2;};
-      panel.Controls.Add(new Label{Text=host?"설정 인원이 모두 접속하면 시작합니다.\n팀전: 양끝 시작 · 전멸 후 다음 라운드 부활\n개인전: 사망 10초 후 랜덤 부활":"방장의 대전 방식과 인원 설정을 따릅니다.\n다음 화면에서 출전 장비를 확인합니다.",
+      panel.Controls.Add(new Label{Text=host?"2명 이상 모이면 대기실에서 방장이 시작합니다.\n팀전: 짝수 인원 · 양끝 시작 · 라운드 종료 후 부활\n개인전: 사망 10초 후 랜덤 부활":"방장의 대전 방식과 인원 설정을 따릅니다.\n장비 확인 후 대기실에서 방장의 시작을 기다립니다.",
         AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,0,0,18)});
       var buttons=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};
       Button go=new Button{Text="장비 확인 →",Size=new Size(130,36)};
@@ -123,6 +123,57 @@ namespace KarmaLocal {
         if(host)address.Focus();else code.Focus();
       };
     }
+  }
+  public sealed class LobbyWindow : Form {
+    readonly Label title,info;
+    readonly ListBox members;
+    readonly Button begin;
+    readonly Action<string> requestStart;
+    readonly Action leave;
+    string roomId="";
+    bool dismissing;
+    static string Read(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)?Convert.ToString(v):"";}
+    static bool Flag(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)&&v is bool&&(bool)v;}
+    public LobbyWindow(Action<string> startMatch,Action leaveRoom) {
+      requestStart=startMatch;leave=leaveRoom;
+      Text="카르마 · 대기실";ClientSize=new Size(560,500);MinimumSize=new Size(430,380);
+      AutoScaleDimensions=new SizeF(96F,96F);AutoScaleMode=AutoScaleMode.Dpi;
+      StartPosition=FormStartPosition.CenterParent;Font=new Font("Malgun Gothic",11);
+      BackColor=Color.FromArgb(21,29,35);ForeColor=Color.White;MinimizeBox=false;MaximizeBox=false;
+      var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Padding=new Padding(22)};
+      panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+      panel.RowStyles.Add(new RowStyle(SizeType.Absolute,64));panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+      panel.RowStyles.Add(new RowStyle(SizeType.Absolute,88));panel.RowStyles.Add(new RowStyle(SizeType.Absolute,58));Controls.Add(panel);
+      title=new Label{Dock=DockStyle.Fill,Font=new Font("Malgun Gothic",13,FontStyle.Bold)};panel.Controls.Add(title,0,0);
+      members=new ListBox{Dock=DockStyle.Fill,IntegralHeight=false,BackColor=Color.FromArgb(30,40,48),ForeColor=Color.White,BorderStyle=BorderStyle.FixedSingle};panel.Controls.Add(members,0,1);
+      info=new Label{Dock=DockStyle.Fill,Padding=new Padding(0,12,0,0),ForeColor=Color.FromArgb(222,181,100)};panel.Controls.Add(info,0,2);
+      var buttons=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,38));buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,62));panel.Controls.Add(buttons,0,3);
+      var cancel=new Button{Text="방 나가기",Dock=DockStyle.Fill};buttons.Controls.Add(cancel,0,0);
+      begin=new Button{Text="대전 시작",Dock=DockStyle.Fill,Enabled=false,BackColor=Color.FromArgb(222,181,100),ForeColor=Color.FromArgb(25,28,26)};buttons.Controls.Add(begin,1,0);
+      cancel.Click+=(s,e)=>Close();begin.Click+=(s,e)=>{
+        try{requestStart(roomId);begin.Enabled=false;info.Text="시작 요청을 보냈습니다…";}
+        catch(Exception ex){MessageBox.Show(this,"시작 요청을 보낼 수 없습니다.\n"+ex.Message);}
+      };
+      FormClosing+=(s,e)=>{if(!dismissing)leave();};
+      Shown+=(s,e)=>{var area=Screen.FromControl(Owner??this).WorkingArea;Size=new Size(Math.Min(Width,area.Width-24),Math.Min(Height,area.Height-24));Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);};
+    }
+    public void UpdateLobby(Dictionary<string,object> data) {
+      roomId=Read(data,"roomId");bool host=Flag(data,"isHost"),manual=Flag(data,"manualStart");
+      string mode=Read(data,"mode"),modeName=mode=="tdm"?"팀 전멸전":mode=="dm"?"개인 데스매치":"1:1 대전";
+      title.Text="방 코드  "+Read(data,"code")+"    ·    "+Read(data,"players")+" / "+Read(data,"maxPlayers")+"명\n"+modeName+(host?" · 방장":"");
+      var lines=new List<string>();object roster;
+      if(data.TryGetValue("members",out roster)&&roster is IEnumerable)foreach(object item in (IEnumerable)roster){
+        var member=item as Dictionary<string,object>;if(member==null)continue;
+        string team=mode=="tdm"?(Read(member,"team")=="0"?"[RED]  ":"[BLUE]  "):"";
+        lines.Add(team+Read(member,"name")+(Read(member,"playerId")==Read(data,"hostId")?"   (방장)":""));
+      }
+      if(!members.Items.Cast<object>().Select(Convert.ToString).SequenceEqual(lines)){
+        members.BeginUpdate();members.Items.Clear();members.Items.AddRange(lines.Cast<object>().ToArray());members.EndUpdate();
+      }
+      begin.Text=host?"대전 시작 →":"방장 시작 대기";begin.Enabled=host&&manual&&Flag(data,"canStart");
+      info.Text=Read(data,"message")+(host&&!Flag(data,"canStart")?"\n"+Read(data,"startReason"):"");
+    }
+    public void Dismiss(){dismissing=true;Close();}
   }
   public class CatalogItem {
     public Dictionary<string,object> Data;
@@ -172,7 +223,8 @@ namespace KarmaLocal {
     TableLayoutPanel contentLayout;
     System.Windows.Forms.Timer watcher;
     Process sessionHelper;
-    bool sessionActive, sessionObservedGame, sessionLan, configuringLan;
+    LobbyWindow lobby;
+    bool sessionActive, sessionObservedGame, sessionLan, configuringLan, lobbyLeaving;
     volatile bool closingLauncher;
     string lanDetails="";
     DateTime sessionStartedUtc;
@@ -396,6 +448,7 @@ namespace KarmaLocal {
       return "";
     }
     void FinishSession() {
+      CloseLobby();
       sessionActive=false;sessionObservedGame=false;
       sessionError=ReadSessionError();
       if(sessionError==""&&sessionHelper!=null)try{
@@ -417,13 +470,20 @@ namespace KarmaLocal {
       if(accountButton!=null)accountButton.Enabled=!sessionActive&&!running;
       if(loadoutButton!=null)loadoutButton.Enabled=!sessionActive&&!running&&!configuringLan&&character!=null;
       if(sessionActive) {
-        if(running&&!sessionObservedGame){sessionObservedGame=true;if(sessionLan)WindowState=FormWindowState.Minimized;}
+        if(running&&!sessionObservedGame){CloseLobby();sessionObservedGame=true;if(sessionLan)WindowState=FormWindowState.Minimized;}
         if(!HelperRunning()||(sessionObservedGame&&!running))FinishSession();
       }
       if(sessionActive&&sessionLan){
         start.Enabled=!sessionObservedGame;start.Text="대기 취소";
         string message="상대를 기다리고 있습니다.";
-        try{var d=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(support,"lan-status.json")));message=Convert.ToString(d["message"]);}catch{}
+        var d=ReadSupportJson("lan-status.json");
+        if(d!=null){
+          object value;if(d.TryGetValue("message",out value))message=Convert.ToString(value);
+          if(!lobbyLeaving&&!sessionObservedGame&&d.TryGetValue("phase",out value)&&Convert.ToString(value)=="waiting"){
+            if(lobby==null||lobby.IsDisposed){lobby=new LobbyWindow(RequestLanStart,()=>{lobby=null;CancelLan();});lobby.UpdateLobby(d);lobby.Show(this);}
+            else lobby.UpdateLobby(d);
+          }else CloseLobby();
+        }
         status.Text=message;summary.Text=lanDetails;modes.Enabled=false;eras.Enabled=false;return;
       }
       modes.Enabled=!sessionActive&&!running;eras.Enabled=modes.Enabled&&modes.SelectedIndex<3;
@@ -431,6 +491,13 @@ namespace KarmaLocal {
       start.Enabled=!running&&!sessionActive&&map!=null&&character!=null&&(!ai||AiReady);
       start.Text=running?"게임 실행 중":sessionActive?"게임 시작 중":ai&&!AiReady?"AI 기능 준비 중":LanMode?(modes.SelectedIndex==4?"서버 방 만들기 →":"서버 참가 →"):"게임 시작  →";
       status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · Mass of Winter":ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
+    }
+    void CloseLobby(){if(lobby!=null){var old=lobby;lobby=null;old.Dismiss();}}
+    void RequestLanStart(string roomId){
+      if(String.IsNullOrEmpty(roomId))return;
+      string command=Path.Combine(support,"lan-start.json"),temp=command+".tmp";
+      File.WriteAllText(temp,json.Serialize(new Dictionary<string,object>{{"roomId",roomId}}),Encoding.UTF8);
+      if(File.Exists(command))File.Delete(command);File.Move(temp,command);
     }
     Dictionary<string,object> ReadSupportJson(string filename) {
       try{
@@ -601,7 +668,7 @@ namespace KarmaLocal {
       if(!File.Exists(node))throw new FileNotFoundException("실행 도구를 찾을 수 없습니다.",node);
       return node;
     }
-    void CancelLan(){try{File.WriteAllText(Path.Combine(support,"lan-cancel.json"),"{}",Encoding.UTF8);}catch{}}
+    void CancelLan(){lobbyLeaving=true;CloseLobby();try{File.WriteAllText(Path.Combine(support,"lan-cancel.json"),"{}",Encoding.UTF8);}catch{}}
     async Task LaunchLan(){
       using(var dialog=new LanSetup(modes.SelectedIndex==4,support)){
         if(dialog.ShowDialog(this)!=DialogResult.OK)return;
@@ -623,7 +690,7 @@ namespace KarmaLocal {
           Arguments="\""+Path.Combine(support,"lan-runtime.mjs")+"\" \""+configPath+"\"",
           WorkingDirectory=game,UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
         if(sessionHelper==null)throw new InvalidOperationException("중앙 서버 대전 도구를 시작할 수 없습니다.");
-        sessionActive=true;sessionObservedGame=false;sessionLan=true;
+        lobbyLeaving=false;sessionActive=true;sessionObservedGame=false;sessionLan=true;
         lanDetails="서버 "+dialog.Host+":"+dialog.Port+"  ·  "+(modes.SelectedIndex==4?"방 만들기":"참가")+"  ·  코드 "+dialog.Code;
         restoreState=WindowState==FormWindowState.Maximized?FormWindowState.Maximized:FormWindowState.Normal;
         UpdateRunning();
