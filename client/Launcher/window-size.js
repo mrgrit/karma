@@ -1,5 +1,32 @@
 // Enlarge this game's window while retaining the original rendering aspect.
 (() => {
+  // Windowed rendering does not require an enumerated fullscreen resolution.
+  // RDP and some modern displays omit 800x600 from that list. Use the current
+  // desktop format only when the native windowed initialization requests it.
+  const windowedInitializers = new Map();
+  Interceptor.attach(ptr('0x416fd0'), {
+    onEnter(args) { this.tid=Process.getCurrentThreadId();windowedInitializers.set(this.tid,args[2].toInt32()!==0); },
+    onLeave() { windowedInitializers.delete(this.tid); }
+  });
+  Interceptor.attach(ptr('0x415e50'), {
+    onEnter() { this.tid=Process.getCurrentThreadId();windowedInitializers.set(this.tid,ptr('0x539f8c').readU32()===0); },
+    onLeave() { windowedInitializers.delete(this.tid); }
+  });
+  Interceptor.attach(ptr('0x4040a0'), {
+    onEnter(args) { this.renderer=this.context.ecx;this.width=args[0].toInt32();this.height=args[1].toInt32();this.windowed=windowedInitializers.get(Process.getCurrentThreadId()); },
+    onLeave(result) {
+      if(!this.windowed||result.toInt32()!==0)return;
+      try {
+        const d3d=this.renderer.add(0x38).readPointer();if(d3d.isNull())return;
+        const mode=Memory.alloc(16);
+        const getMode=new NativeFunction(d3d.readPointer().add(8*4).readPointer(),'int',['pointer','uint','pointer'],'stdcall');
+        const status=getMode(d3d,0,mode),format=mode.add(12).readU32();
+        if(status<0||![21,22,23,24].includes(format))return;
+        result.replace(format);
+        send({event:'windowed-display-format-fallback',requested:[this.width,this.height],desktop:[mode.readU32(),mode.add(4).readU32()],format});
+      } catch(error) { send({event:'windowed-display-format-error',message:String(error)}); }
+    }
+  });
   const u=Process.getModuleByName('user32.dll');
   const call=(name,result,args)=>new NativeFunction(u.getExportByName(name),result,args,'stdcall');
   const workArea=call('SystemParametersInfoW','int',['uint','uint','pointer','uint']);

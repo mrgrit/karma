@@ -56,7 +56,7 @@ function create(role,config={}){
  }
  const context={ptr:p,Process:{mainModule:{name:'KarmaSession.exe'},id:role==='host'?1:2},
   KARMA_LAN_CONFIG:{role,...config},KARMA_LOCAL_PAUSED:false,Date:{now:()=>time},send:e=>events.push(e),rpc:{exports:{}},
-  Memory:{alloc(n){const r=p(allocation);allocation+=n;return r;}},
+  Memory:{alloc(n){const r=p(allocation);allocation+=n;return r;},allocUtf8String(s){const r=p(allocation);allocation+=s.length+1;r.writeUtf8String(s);return r;}},
   Interceptor:{attach(address,h){const list=hooks.get(address.a)||[];list.push(h);hooks.set(address.a,list);}},
   NativeFunction:function(address){return (...args)=>{
    calls.push([address.a,...args]);
@@ -98,6 +98,7 @@ function create(role,config={}){
     case 0x44afd0:remote.add(0x19b8).writeFloat(args[2]);break;
     case 0x45e3a0:actor.add(0x264).writeS32(725);break;
     case 0x464160:actor.add(0x290).writeU8(args[1]);break;
+    case 0x444ac0:return 4;
     case 0x463100:actor.add(0x1971).writeU8(args[1]);break;
     case 0x462560:actor.add(0x1972).writeU8(args[1]);break;
     case 0x461ae0:case 0x461d50:actor.add(0x264).writeS32(Math.max(625,actor.add(0x264).readS32()-40));break;
@@ -235,3 +236,10 @@ const death=loadout.events.filter(e=>e.message?.type==='death').at(-1)?.message;
 assert.equal(death.damageId,blastProof.id);assert.equal(death.hpAfter,0);
 assert.equal(death.drop.selectedWeapon,10);assert.equal(death.drop.magazine,0);assert.equal(death.drop.reserve,0);
 console.log('PASS: configured seven-slot inventory/equip; native claim gate and pending dedup; appended grant; exact zero ammo; duplicate/stale grants; removal-before-create; bullet/projectile damage proof; exact death drop snapshot.');
+
+const initialPositions=roomId=>Array.from({length:8},(_,slot)=>JSON.stringify(create('host',{slot,match:{mode:'dm',roomId}}).rpc.lanstatus().local.pos));
+const firstRoom=initialPositions('room-alpha');
+assert.equal(new Set(firstRoom).size,8,'All eight initial DM spawns must be distinct');
+assert.deepEqual(initialPositions('room-alpha'),firstRoom,'All clients agree on one room permutation');
+assert.notDeepEqual(initialPositions('room-beta'),firstRoom,'A new room changes initial positions');
+console.log('PASS: room-specific random initial deathmatch spawns without overlap.');

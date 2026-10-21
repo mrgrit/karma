@@ -1,11 +1,11 @@
 {
   "name": "karma-lan-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "test": "node tests/lan_transport_test.mjs && node tests/central_transport_test.mjs && node tests/lan_game_test.mjs && node tests/input_lan_test.cjs && node tests/input_pause_test.cjs"
+    "test": "node tests/lan_transport_test.mjs && node tests/central_transport_test.mjs && node tests/lan_game_test.mjs && node tests/input_lan_test.cjs && node tests/input_pause_test.cjs && node tests/window_size_test.cjs"
   }
 }

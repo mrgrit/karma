@@ -33,7 +33,7 @@ export function writeIdentity(filename,value){
   fs.renameSync(temp,filename);
 }
 export async function createCentralPeer({
-  role,host='192.168.12.100',port=29020,code,config,
+  role,host='192.168.12.100',port=29020,code,config,maxPlayers=2,mode='duel',
   secure=true,caFile=defaultCa,
   identityPath=identityPathFor(host,port),identity=readIdentity(identityPath),
   onMessage=()=>{},onStatus=()=>{},onProfile=()=>{},onIdentity=()=>{},
@@ -43,7 +43,7 @@ export async function createCentralPeer({
   if(!Number.isInteger(port)||port<1||port>65535)throw TypeError('Invalid server port');
   if(!/^\d{6}$/.test(code))throw TypeError('A six-digit room code is required');
   let resolveReady,rejectReady,closed=false,settled=false,connected=false;
-  let effectiveConfig=config,ownId=identity.playerId,remoteId,roomCode=code;
+  let effectiveConfig=config,ownId=identity.playerId,remoteId,roomCode=code,peers=[],slot=0,team=0,match={};
   let buffer=Buffer.alloc(0),pendingState,lastShotKey,flushTimer,welcomed=false;
   const ready=new Promise((resolve,reject)=>{resolveReady=resolve;rejectReady=reject;});
   // The caller attaches after this asynchronous factory returns.
@@ -84,28 +84,36 @@ export async function createCentralPeer({
       const credential={...identity,playerId:ownId};
       writeIdentity(identityPath,credential);onIdentity(credential);profile(message.profile);
       roomCode=message.room?.code||code;
-      report({phase:'listening',code:roomCode,server:host,roomId:message.room?.roomId});
+      match=message.room||{};slot=message.slot??0;team=message.team??0;
+      report({phase:'listening',code:roomCode,server:host,roomId:message.room?.roomId,...match,players:1});
       return;
     }
-    if(message.type==='waiting'){report({phase:'listening',code:message.code,server:host});return;}
+    if(message.type==='waiting'){report({phase:'listening',...message,server:host});return;}
     if(message.type==='profile'){profile(message.profile);return;}
     if(message.type==='peer-ready'){
-      if(!welcomed||settled||message.peers?.length!==1||!message.remoteHello)throw Error('이 클라이언트는 2인 방을 지원합니다.');
-      effectiveConfig=message.config;remoteId=message.remoteHello.playerId;
+      if(!welcomed||settled||!Array.isArray(message.peers)||message.peers.length<1||message.peers.length>7||!message.remoteHello)throw Error('잘못된 참가자 목록입니다.');
+      peers=message.peers.length===1&&!message.peers[0].playerId?[message.remoteHello]:message.peers;
+      if(new Set(peers.map(p=>p.playerId)).size!==peers.length||peers.some(p=>typeof p.playerId!=='string'||p.playerId===ownId))throw Error('중복 참가자입니다.');
+      effectiveConfig=message.config;remoteId=message.remoteHello.playerId;slot=message.slot??slot;team=message.team??team;
+      match={...match,mode:message.mode??match.mode??'duel',maxPlayers:message.maxPlayers??peers.length+1,killLimit:message.killLimit,timeLimitSeconds:message.timeLimitSeconds,respawnMs:message.respawnMs,roundWinLimit:message.roundWinLimit};
       profile(message.profile);connected=true;settled=true;
       flushTimer=setInterval(flush,50);
       report({phase:'connected',code:roomCode});
       resolveReady(message.remoteHello);return;
     }
     if(message.type==='game'){
-      if(!connected||message.senderId!==remoteId)return;
-      onMessage(validateLanMessage(message.message));return;
+      if(!connected||!peers.some(p=>p.playerId===message.senderId))return;
+      onMessage({...validateLanMessage(message.message),senderId:message.senderId});return;
     }
+    if(message.type==='round-start'||message.type==='round-ended'){report({phase:message.type,...message});onMessage({...message,version:1});return;}
     if(message.type==='death-confirmed'||message.type==='proof-rejected'){
-      report({phase:message.type,...message});return;
+      report({phase:message.type,...message});
+      if(message.type==='death-confirmed'&&config.settings?.build==='karma290-central3')onMessage({...message,version:1});
+      return;
     }
     if(INBOUND.has(message.type)){onMessage({...message,version:1});return;}
-    if(message.type==='peer-left'||message.type==='room-closed'||message.type==='room-ended'||message.type==='match-ended'){
+    if(message.type==='peer-left'){onMessage({version:1,type:'peer-left',playerId:message.playerId});return;}
+    if(message.type==='room-closed'||message.type==='room-ended'||message.type==='match-ended'){
       if(message.type==='match-ended')report({phase:'match-ended',result:message.result});
       onMessage({version:1,type:'leave',reason:message.reason||'peer-left'});return;
     }
@@ -116,7 +124,7 @@ export async function createCentralPeer({
   socket.once(secure?'secureConnect':'connect',()=>{
     report({phase:'connecting',server:host});
     write({type:'hello',version:2,op:role==='host'?'create':'join',code,
-      authToken:identity.authToken,config,clientMaxPlayers:2,maxPlayers:2});
+      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode});
   });
   socket.on('data',chunk=>{
     try{
@@ -136,6 +144,7 @@ export async function createCentralPeer({
   return {
     ready,port,
     get connected(){return connected;},get effectiveConfig(){return effectiveConfig;},
+    get peers(){return peers;},get slot(){return slot;},get team(){return team;},get match(){return match;},
     get playerId(){return ownId;},get remotePlayerId(){return remoteId;},get code(){return roomCode;},
     send(message){
       if(!connected||closed)return false;
@@ -155,7 +164,7 @@ export async function createCentralPeer({
         pendingState=validated;return true;
       }
       if(shotKey)lastShotKey=shotKey;
-      flush();return write({type:'game',message:validated});
+      flush();return write({type:'game',message:validated,...(validated.targetId?{targetId:validated.targetId}:{})});
     },
     close(){
       if(closed)return;

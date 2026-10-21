@@ -42,7 +42,7 @@ try {
     profile=Object.fromEntries(Object.entries(saved).filter(([key,value])=>key.length<40&&typeof value==='number'&&Number.isFinite(value)));
   }catch{}
   const moduleSource=file=>'\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
-  let source='globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\n'+moduleSource('input-menu.js');
+  let source='globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('input-menu.js');
   source+=moduleSource('offline-death.js');
   source+=moduleSource('practice-end.js');
   source+=moduleSource('window-size.js');

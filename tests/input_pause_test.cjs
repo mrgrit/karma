@@ -183,7 +183,7 @@ function harness(bad = '') {
   assert.equal(h.bytes.get(0x5051),0);
   assert.equal(h.events.filter(e=>e.kind==='pause-requested').length,1,'held F10 does not toggle repeatedly');
   h.s.rawTick=601000;assert.equal(h.clock(),1000,'native game clock frozen for ten minutes');
-  h.s.held.clear();h.frame();h.s.held.add(0x79);h.frame();
+  h.s.held.clear();h.frame();h.s.held.add(0x79);h.command('resume');h.windowMessage(0x84a1);
   assert.equal(h.inspect().paused,false);assert.equal(h.s.cursor,-2);
   assert.equal(h.retained.flagPage.readU8(),0);
   assert.equal(h.clock(),1000,'resume has no elapsed-time spike');
@@ -283,13 +283,24 @@ for(const [down,up] of [[0x100,0x101],[0x104,0x105]]) {
   h.s.held.clear();h.windowMessage(up,0x79,0xc0000000);
   assert.equal(h.s.deliveredMessage,0,'F10 release consumed');
   h.windowMessage(down,0x79);
-  assert.equal(h.inspect().paused,false,'new short press resumes');
+  assert.equal(h.inspect().paused,true,'game F10 cannot resume behind the menu');
+  h.s.held.add(0x79);h.command('resume');h.windowMessage(0x84a1);
   h.s.held.add(0x79);h.frame();h.keyboard(0x44,true);
   assert.equal(h.inspect().paused,false,'resuming message edge stays latched through async/DI');
   assert.equal(h.events.filter(e=>e.kind==='pause-resumed').length,1);
   h.s.held.clear();h.windowMessage(up,0x79,0xc0000000);h.frame();
   h.windowMessage(down,0x1b);
   assert.equal(h.s.deliveredMessage,0);assert.equal(h.s.quits,1,'short Escape exits immediately');
+}
+// RDP delivered the window message 15ms after the polled press. A frame
+// observing release in between used to resume behind a still-open menu.
+{
+  const h=harness();h.s.held.add(0x79);h.frame();
+  h.s.held.clear();h.frame();h.windowMessage(0x104,0x79);
+  assert.equal(h.inspect().paused,true,'delayed window edge keeps menu input released');
+  assert.equal(h.s.cursor,0);assert.equal(h.events.filter(e=>e.kind==='pause-resumed').length,0);
+  h.keyboard(0x11,true);h.mouse();assert.equal(h.bytes.get(0x5051),0);
+  h.command('resume');h.windowMessage(0x84a1);assert.equal(h.inspect().paused,false);
 }
 for(const origin of ['async','directinput']) {
   const h=harness();h.s.held.add(0x79);

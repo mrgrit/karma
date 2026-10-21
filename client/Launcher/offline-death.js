@@ -40,10 +40,11 @@
    if(index<0||index>7)return;
    const a=m.add(0xfcc+index*4).readPointer(),health=a.add(0x264).readS32()-625;
    if(health>0){off.deadAt=0;return;}
-   const now=gameClock();
-   if(!off.deadAt){off.deadAt=now;send({event:'offline-player-death',hp:health,respawnInMs:4500});return;}
-   if(((now-off.deadAt)>>>0)<4500)return;
-   const prior=m.add(0x1050).readPointer(),s=off.spawn;
+   const now=gameClock(),respawnDelay=globalThis.KARMA_LAN_CONFIG?.match?.mode==='dm'?10000:4500;
+   if(!off.deadAt){off.deadAt=now;send({event:'offline-player-death',hp:health,respawnInMs:globalThis.KARMA_LAN_CONFIG?.match?.mode==='tdm'?null:respawnDelay});return;}
+   if(((now-off.deadAt)>>>0)<respawnDelay)return;
+   const selected=globalThis.KARMA_LAN_RESPAWN?.(m);if(selected===false)return;
+   const prior=m.add(0x1050).readPointer(),s=selected||off.spawn;
    try{
     m.add(0x1050).writePointer(a);
     respawn(m,s.sector,s.position[0],s.position[1],s.position[2],s.yaw*180/Math.PI);

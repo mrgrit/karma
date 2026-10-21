@@ -63,8 +63,8 @@ function deathInventory(){
 function rememberDeathInventory(){loot.deathSnapshot=deathInventory();}
 function reportDamage(before,after,owner,weapon,shot){
  if(before<=0||after>=before||!shot||!idValid(shot.id)||!integer(shot.life,1,1e9))return;
- const attackerId=owner===0?cfg.localPlayerId:owner===1?cfg.remotePlayerId:null;
- const proof={id:cfg.role+':'+st.life+':damage:'+ ++loot.damageSerial,shotId:shot.id,victimLife:st.life,attackerId:attackerId||null,
+ const attackerId=playerId(owner);
+ const proof={id:selfId+':'+st.life+':damage:'+ ++loot.damageSerial,shotId:shot.id,victimLife:st.life,attackerId:attackerId||null,
   attackerLife:attackerId?shot.life:null,attackerSlot:owner,weapon,before,after};
  loot.lastDamage=proof;
  send({event:'lan-damage-proof',proof});
@@ -171,7 +171,7 @@ Interceptor.attach(P(0x452540),{
   const d=loot.indices.get(this.index);
   if(!d||d.pending||st.localDead||hp(st.p)<=0||now()-d.lastAttempt<1500)return;
   d.pending=true;d.lastAttempt=now();
-  const requestId=cfg.role+':'+st.life+':pickup:'+ ++loot.claimSerial;
+  const requestId=selfId+':'+st.life+':pickup:'+ ++loot.claimSerial;
   emit({type:'pickup-claim',dropId:d.id,requestId,life:st.life});
  }
 });

@@ -306,10 +306,10 @@ function hotkeys(source, escape, f10) {
   escapeDown = escape;
   f10Down = f10;
   if (newEscape) requestExit(source);
-  else if (newF10) {
-    if (paused) resumePause(source);
-    else requestPause(source);
-  }
+  // The external menu owns resume. A delayed WM_KEYDOWN can follow an
+  // async press and release (notably over RDP); it must not reopen input
+  // while the menu is still visible.
+  else if (newF10 && !paused) requestPause(source);
 }
 function serviceFrame() {
   reportDpiWindow();
@@ -484,4 +484,4 @@ Memory.patchCode(dispatcherCall, 5, code => code.writeByteArray(
 send({ kind: 'input-menu-ready', keys: { Escape: 'quit', F10: 'input-menu' },
   sources: ['window-key', 'directinput', 'async-key', 'external-menu'], behavior: 'external-input-menu', mode: 'lan', pausesWorld: false,
   confirmation: false, nativeFrameGate: gate.toString(),
-  nativeClockGate: retained.clockPage.toString(), clockArithmetic: 'native-uint32', version: 8 });
+  nativeClockGate: retained.clockPage.toString(), clockArithmetic: 'native-uint32', version: 9 });

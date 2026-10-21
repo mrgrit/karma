@@ -61,7 +61,7 @@ const openMenu=message=>{
   },100);
 };
 const queued=[];
-let queuedShotKey=null;
+const queuedShotKeys=new Map();
 const characterConfig=value=>{
   if(!value||!Number.isInteger(value.index)||!Number.isInteger(value.camp))throw Error('상대 캐릭터 설정이 올바르지 않습니다.');
   const catalog=readJson(path.join(support,'catalog.json'));
@@ -76,19 +76,23 @@ try{
   const central=options.transport==='central';
   let config={map:0,age:0,character:localCharacter,
     ...(central?{inventory:options.config.inventory,selectedWeapon:options.config.selectedWeapon}:{}),
-    settings:{build:central?'karma290-central2':'karma290-lan1',mode:1}};
+    settings:{build:central?'karma290-central3':'karma290-lan1',mode:1}};
   status('connecting',options.role==='host'?'방을 준비하고 있습니다.':'방에 접속하고 있습니다.');
   peer=await (central?createCentralPeer:createLanPeer)({
     role:options.role,host:options.host,port:options.port||29020,code:String(options.code),config,
+    maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',
     onStatus:detail=>{
       log('lan-status',detail);
       const phase=detail.phase||detail.type||detail.status;
-      if(phase==='listening')status('waiting','방 열림 · 코드 '+(detail.code||options.code)+' · 상대 참가를 기다립니다.');
+      if(phase==='listening')status('waiting','방 열림 · 코드 '+(detail.code||options.code)+' · '+(detail.players||1)+' / '+(detail.maxPlayers||options.maxPlayers||2)+'명 참가 대기');
+      if(phase==='round-ended')status('playing','라운드 '+detail.round+' 종료 · '+detail.roundWins.join(' : ')+' · 다음 라운드 준비');
+      if(phase==='round-start')status('playing','라운드 '+detail.round+' · 한 팀 전멸 시 종료 · F10 메뉴');
       if(phase==='match-ended'){
         const result=detail.result||{},winner=result.winnerIds?.includes(peer?.playerId);
         const label=result.draw?'무승부':winner?'승리':'패배';
         const score=result.scores?.[peer?.playerId]??0,other=result.scores?.[peer?.remotePlayerId]??0;
-        stop('대전 종료 · '+label+' · '+score+' : '+other+' · 전적을 저장했습니다.');
+        const scoreText=result.mode==='tdm'?'라운드 '+(result.roundWins||result.teamScores).join(' : '):'내 킬 '+score;
+        stop('대전 종료 · '+label+' · '+scoreText+' · 전적을 저장했습니다.');
       }
       if(phase==='disconnected'&&connected&&!closing)stop('상대와의 연결이 끊겨 대전을 종료했습니다.',true);
     },
@@ -100,10 +104,10 @@ try{
       else {
         if(message.type==='state'&&message.shot){
           const key=message.shot.life+':'+message.shot.id;
-          if(key===queuedShotKey){message={...message};delete message.shot;}else queuedShotKey=key;
+          if(key===queuedShotKeys.get(message.senderId)){message={...message};delete message.shot;}else queuedShotKeys.set(message.senderId,key);
         }
         if(message.type==='state'&&!message.shot){
-          const older=queued.findIndex(x=>x.type==='state'&&!x.shot);
+          const older=queued.findIndex(x=>x.type==='state'&&x.senderId===message.senderId&&!x.shot);
           if(older>=0)queued.splice(older,1);
         }
         if(queued.length>=256){stop('게임 로딩 중 통신 대기열이 가득 찼습니다.',true);return;}
@@ -133,9 +137,10 @@ try{
     validationTimer=setTimeout(()=>stop('테스트 제한 시간이 끝났습니다.'),runtime.validationSeconds*1000);
   session=await device.attach(pid);checkClosing();
   const lanConfig={role:options.role,localCharacter,remoteCharacter,local:config,remote:remoteHello.config,remoteHello,
-    central,localPlayerId:peer.playerId,remotePlayerId:peer.remotePlayerId};
+    central,localPlayerId:peer.playerId,remotePlayerId:peer.remotePlayerId,
+    peers:central?peer.peers:undefined,slot:peer.slot,team:peer.team,match:peer.match};
   let source='globalThis.KARMA_LAN_CONFIG='+JSON.stringify(lanConfig)+';\n';
-  for(const file of ['input-lan.js','offline-death.js','window-size.js','lan-game.js'])
+  for(const file of ['startup-diagnostics.js','input-lan.js','offline-death.js','window-size.js','lan-game.js'])
     source+='\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
   source+='\nrpc.exports.compatibilitystatus=()=>({ready:true});';
   script=await session.createScript(source);checkClosing();
@@ -149,8 +154,10 @@ try{
       return;
     }
     log('agent',payload);
+    if(payload.event==='offline-player-death')status('playing',peer.match?.mode==='tdm'?'전사 · 팀전은 다음 라운드에 다시 등장합니다.':peer.match?.mode==='dm'?'전사 · 10초 후 랜덤 위치에서 다시 등장합니다.':'전사 · 잠시 후 다시 등장합니다.');
+    if(payload.event==='lan-local-respawn')status('playing','재등장 · Tab 점수판 · F10 메뉴 · Esc 종료');
     if(payload.kind==='exit-requested')stop('LAN 대전을 종료했습니다.');
-    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);status('playing','LAN 대전 중 · F10 메뉴 · Esc 종료');}
+    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 4:4 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료');}
     if(payload.kind==='pause-requested')openMenu(payload);
   });
   const done=new Promise(resolve=>session.detached.connect((reason,crash)=>{

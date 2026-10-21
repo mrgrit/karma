@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -29,13 +29,15 @@ namespace KarmaLocal {
          !Path.GetFileName(commandPath).StartsWith("pause-",StringComparison.Ordinal))
         throw new InvalidDataException("일시 정지 명령 경로가 올바르지 않습니다.");
       gameWindow=new IntPtr(Convert.ToInt64(hwnd.Replace("0x",""),16));gamePid=pid;
-      Text=lan?"카르마 · LAN 메뉴":"카르마 · 일시 정지";ClientSize=new Size(410,190);FormBorderStyle=FormBorderStyle.FixedDialog;
+      Text=lan?"카르마 · LAN 메뉴":"카르마 · 일시 정지";ClientSize=new Size(410,lan?265:190);FormBorderStyle=FormBorderStyle.FixedDialog;
       AutoScaleMode=AutoScaleMode.Dpi;StartPosition=FormStartPosition.CenterScreen;
       MaximizeBox=false;MinimizeBox=false;TopMost=true;KeyPreview=true;
       BackColor=Color.FromArgb(21,29,35);ForeColor=Color.White;Font=new Font("Malgun Gothic",11);
       Controls.Add(new Label{Text=lan?"LAN 메뉴 · 대전은 계속됩니다.\n마우스를 자유롭게 사용할 수 있습니다.":"일시 정지\n마우스를 자유롭게 사용할 수 있습니다.",Location=new Point(24,22),Size=new Size(362,70)});
       Button resume=new Button{Text="계속  (F10)",Location=new Point(24,115),Size=new Size(170,48)};
       Button exit=new Button{Text="게임 종료  (Esc)",Location=new Point(210,115),Size=new Size(176,48)};
+      var matchStatus=new Label{Location=new Point(24,91),Size=new Size(362,80),ForeColor=Color.FromArgb(223,184,105)};
+      if(lan){Controls.Add(matchStatus);resume.Top=190;exit.Top=190;}
       Controls.Add(resume);Controls.Add(exit);AcceptButton=resume;
       resume.Click+=(s,e)=>Submit("resume");exit.Click+=(s,e)=>Submit("quit");
       KeyDown+=(s,e)=>{if(e.KeyCode==Keys.F10){e.Handled=true;Submit("resume");}else if(e.KeyCode==Keys.Escape){e.Handled=true;Submit("quit");}};
@@ -43,7 +45,10 @@ namespace KarmaLocal {
       FormClosing+=(s,e)=>{if(choice=="")WriteChoice("resume");};
       FormClosed+=(s,e)=>{watcher.Stop();watcher.Dispose();if(choice=="resume")SetForegroundWindow(gameWindow);};
       watcher=new System.Windows.Forms.Timer{Interval=700};
-      watcher.Tick+=(s,e)=>{try{using(Process p=Process.GetProcessById(gamePid)){if(p.HasExited)Close();}}catch{Close();}};
+      watcher.Tick+=(s,e)=>{
+        try{using(Process p=Process.GetProcessById(gamePid)){if(p.HasExited)Close();}}catch{Close();}
+        if(lan)try{var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(allowed,"lan-status.json")));matchStatus.Text=Convert.ToString(value["message"]);}catch{}
+      };
       watcher.Start();
     }
     void WriteChoice(string value){File.WriteAllText(commandPath,"{\"action\":\""+value+"\"}",Encoding.UTF8);choice=value;}
@@ -51,11 +56,12 @@ namespace KarmaLocal {
   }
   public sealed class LanSetup : Form {
     public string Host="",Code="";
-    public int Port=29020;
+    public int Port=29020,MaxPlayers=2;
+    public string MatchMode="duel";
     public string AddressDisplay {get{return address.Text;}}
     readonly TextBox address,code;
     public LanSetup(bool host,string support) {
-      Text=host?"중앙 서버 · 방 만들기":"중앙 서버 · 참가";ClientSize=new Size(520,420);
+      Text=host?"중앙 서버 · 방 만들기":"중앙 서버 · 참가";ClientSize=new Size(520,560);
       AutoScaleDimensions=new SizeF(96F,96F);AutoScaleMode=AutoScaleMode.Dpi;Font=new Font("Malgun Gothic",10);
       FormBorderStyle=FormBorderStyle.Sizable;StartPosition=FormStartPosition.CenterParent;
       MaximizeBox=false;MinimizeBox=false;
@@ -81,7 +87,16 @@ namespace KarmaLocal {
       code=new TextBox{Text=host?(BitConverter.ToUInt32(random,0)%1000000).ToString("D6"):"",
         MaxLength=6,Width=190,Margin=new Padding(0,0,0,16)};
       panel.Controls.Add(code);
-      panel.Controls.Add(new Label{Text="2인 · Mass of Winter · TCP 29020\n다음 화면에서 출전 장비를 확인합니다.",
+      var matchMode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Top,Margin=new Padding(0,0,0,12)};
+      matchMode.Items.AddRange(new object[]{"1:1 대전 (2명)","4:4 팀전 (8명 · 전멸전)","개인 데스매치 (2~8명)"});matchMode.SelectedIndex=0;
+      var capacity=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Width=180,Margin=new Padding(0,0,0,16)};
+      capacity.Items.AddRange(new object[]{2,3,4,5,6,7,8});capacity.SelectedIndex=6;capacity.Enabled=false;
+      if(host){
+        panel.Controls.Add(new Label{Text="대전 방식",AutoSize=true});panel.Controls.Add(matchMode);
+        panel.Controls.Add(new Label{Text="개인전 참가 인원",AutoSize=true});panel.Controls.Add(capacity);
+      }
+      matchMode.SelectedIndexChanged+=(s,e)=>{capacity.Enabled=matchMode.SelectedIndex==2;};
+      panel.Controls.Add(new Label{Text=host?"설정 인원이 모두 접속하면 시작합니다.\n팀전: 양끝 시작 · 전멸 후 다음 라운드 부활\n개인전: 사망 10초 후 랜덤 부활":"방장의 대전 방식과 인원 설정을 따릅니다.\n다음 화면에서 출전 장비를 확인합니다.",
         AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,0,0,18)});
       var buttons=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};
       Button go=new Button{Text="장비 확인 →",Size=new Size(130,36)};
@@ -95,6 +110,8 @@ namespace KarmaLocal {
         }
         if(code.Text.Length!=6||code.Text.Any(c=>c<'0'||c>'9')){MessageBox.Show(this,"숫자 6자리 방 코드를 입력해 주세요.");return;}
         Host=ip.ToString();Code=code.Text;
+        MatchMode=matchMode.SelectedIndex==1?"tdm":matchMode.SelectedIndex==2?"dm":"duel";
+        MaxPlayers=MatchMode=="tdm"?8:MatchMode=="dm"?Convert.ToInt32(capacity.SelectedItem):2;
         try{File.WriteAllText(serverPath,serializer.Serialize(new Dictionary<string,object>{{"host",Host},{"port",Port}}),Encoding.UTF8);}
         catch(Exception ex){MessageBox.Show(this,"서버 주소를 저장할 수 없습니다.\n"+ex.Message);return;}
         DialogResult=DialogResult.OK;Close();
@@ -233,7 +250,7 @@ namespace KarmaLocal {
       body.Controls.Add(sidebar,0,0);
       LabelAt(sidebar,"플레이 방식",20,22,194,22,10,muted,true);
       modes=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Location=new Point(20,51),Width=194,FlatStyle=FlatStyle.Flat};
-      modes.Items.AddRange(new object[]{"맵 자유 탐험","저격 맵 탐험","사격 연습","AI 1명 대전 (시험판)","서버 방 만들기 (2인)","서버 참가 (2인)"});
+      modes.Items.AddRange(new object[]{"맵 자유 탐험","저격 맵 탐험","사격 연습","AI 1명 대전 (시험판)","서버 방 만들기 (2~8인)","서버 참가 (2~8인)"});
       modes.SelectedIndex=0; sidebar.Controls.Add(modes);
       modes.SelectedIndexChanged+=(s,e)=>{if(!initializing){SelectDefaults();RefreshCards();}};
       LabelAt(sidebar,"시대",20,99,194,22,10,muted,true);
@@ -413,7 +430,7 @@ namespace KarmaLocal {
       bool ai=modes.SelectedIndex==3;
       start.Enabled=!running&&!sessionActive&&map!=null&&character!=null&&(!ai||AiReady);
       start.Text=running?"게임 실행 중":sessionActive?"게임 시작 중":ai&&!AiReady?"AI 기능 준비 중":LanMode?(modes.SelectedIndex==4?"서버 방 만들기 →":"서버 참가 →"):"게임 시작  →";
-      status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"중앙 서버 2인 대전 · Mass of Winter · 출전 전에 장비 확인":ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
+      status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · Mass of Winter":ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
     }
     Dictionary<string,object> ReadSupportJson(string filename) {
       try{
@@ -593,7 +610,7 @@ namespace KarmaLocal {
         if(loadout==null)return;
         string configPath=Path.Combine(support,"lan-config-"+Guid.NewGuid().ToString("N")+".json");
         var options=new Dictionary<string,object>{
-          {"transport","central"},{"role",modes.SelectedIndex==4?"host":"join"},{"host",dialog.Host},{"port",dialog.Port},{"code",dialog.Code},
+          {"transport","central"},{"role",modes.SelectedIndex==4?"host":"join"},{"host",dialog.Host},{"port",dialog.Port},{"code",dialog.Code},{"maxPlayers",dialog.MaxPlayers},{"matchMode",dialog.MatchMode},
           {"config",new Dictionary<string,object>{
             {"character",new Dictionary<string,object>{{"id",character.Id},{"index",character.Number("characterIndex",0)},
               {"camp",character.Number("camp",0)},{"name",character.Read("enName")},

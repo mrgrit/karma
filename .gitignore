@@ -12,3 +12,4 @@ client/Launcher/pause-*.json
 tests/generated-messages.json
 node_modules/
 __pycache__/
+tests/native-eight-*.jsonl
