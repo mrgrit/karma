@@ -945,7 +945,14 @@ namespace KarmaLocal {
         string[] args=Environment.GetCommandLineArgs();
         if(args.Length==4&&args[1]=="--coin-hud")Application.Run(new CoinHud(Int32.Parse(args[2]),Int32.Parse(args[3])));
         else if((args.Length==5||args.Length==6)&&args[1]=="--pause")Application.Run(new PauseWindow(args[2],args[3],Int32.Parse(args[4]),args.Contains("--lan")));
-        else Application.Run(new Launcher());
+        else {
+          string installRoot=AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
+          using(var lease=ReleaseUpdate.Acquire(installRoot)){
+            if(lease==null){MessageBox.Show("카르마가 이미 실행 중입니다. 열려 있는 창을 확인해 주세요.","카르마");return;}
+            try{using(var update=new UpdateWindow(installRoot)){Application.Run(update);if(update.Ready)Application.Run(new Launcher());}}
+            finally{lease.ReleaseMutex();}
+          }
+        }
       }catch(Exception e){MessageBox.Show(e.Message,"카르마 로컬 실행",MessageBoxButtons.OK,MessageBoxIcon.Error);}
     }
   }
