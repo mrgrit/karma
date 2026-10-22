@@ -1,6 +1,6 @@
 'use strict';
 // LAN input menu, based on the verified single-player v8 helper.
-// F10 releases local input while native frames, combat and network continue.
+// F10/T/Y release local input while native frames, combat and network continue.
 // Escape opens an external exit confirmation. Menu commands and device changes run on the game thread.
 const user32 = Process.getModuleByName('user32.dll');
 const api = (name, ret, args) => new NativeFunction(user32.getExportByName(name), ret, args, 'stdcall');
@@ -80,11 +80,11 @@ const arrowCursor = loadCursor(ptr(0), ptr(32512));
 const quit = api('PostQuitMessage', 'void', ['int']);
 const postMessage = api('PostMessageW', 'int', ['pointer', 'uint', 'pointer', 'pointer']);
 const MENU_MESSAGE = 0x84a1;
-let exitRequested = false, paused = false, resumePending = false;
-let escapeDown = false, f10Down = false;
+let exitRequested = false, paused = false, resumePending = false, matchFinished = false;
+let escapeDown = false, f10Down = false, chatAllDown = false, chatTeamDown = false;
 // A high bit at startup/focus return is a held state, not a new key press.
 // Each polling source must independently observe release before it can act.
-const pollArmed = { 'async-key': [false, false], directinput: [false, false] };
+const pollArmed = { 'async-key': [false, false, false, false], directinput: [false, false, false, false] };
 const heldReported = new Set();
 function resetHotkeyPolling() {
   for (const state of Object.values(pollArmed)) state.fill(false);
@@ -98,7 +98,7 @@ function polledPressAllowed(source, index, held) {
   const key = source + ':' + index;
   if (!heldReported.has(key)) {
     heldReported.add(key);
-    send({ kind: 'hotkey-held-on-focus', source, key: index === 0 ? 'Escape' : 'F10' });
+    send({ kind: 'hotkey-held-on-focus', source, key: ['Escape', 'F10', 'T', 'Y'][index] });
   }
   return false;
 }
@@ -119,7 +119,7 @@ const retained = globalThis.KARMA_LOCAL_INPUT_NATIVE = {
 };
 retained.flagPage.writeU8(0);
 // LAN never pauses world simulation for a local menu or focus loss.
-function updateGate() { retained.flagPage.writeU8(exitRequested ? 1 : 0); }
+function updateGate() { retained.flagPage.writeU8(exitRequested || matchFinished ? 1 : 0); }
 function guardBytes(address, expected, label) {
   const actual = new Uint8Array(address.readByteArray(expected.length));
   if (expected.some((value, i) => actual[i] !== value)) {
@@ -235,8 +235,8 @@ function inputUnavailable() {
   const hwnd = ptr('0x548d50').readPointer();
   return hwnd.isNull() || !foreground().equals(hwnd);
 }
-function requestPause(source, confirmExit = false) {
-  if (exitRequested || paused) return false;
+function requestPause(source, confirmExit = false, chatChannel = null) {
+  if (exitRequested || matchFinished || paused) return false;
   // Keep the native game clock running during the LAN input menu.
   paused = true;
   resumePending = false;
@@ -247,12 +247,13 @@ function requestPause(source, confirmExit = false) {
   catch (error) { send({ kind: 'pause-release-warning', message: String(error) }); }
   try { clearInputBuffers(getInput()); }
   catch (error) { send({ kind: 'pause-clear-warning', message: String(error) }); }
-  send({ kind: 'pause-requested', source, confirmExit, inputOnly: true, worldContinues: true,
+  send({ kind: chatChannel ? 'chat-requested' : 'pause-requested', source,
+    ...(chatChannel ? {channel: chatChannel} : {confirmExit}), inputOnly: true, worldContinues: true,
     hwnd: ptr('0x548d50').readPointer().toString(), pid: Process.id });
   return true;
 }
 function resumePause(source) {
-  if (exitRequested || !paused) return false;
+  if (exitRequested || matchFinished || !paused) return false;
   const hwnd = ptr('0x548d50').readPointer();
   if (hwnd.isNull() || !foreground().equals(hwnd)) {
     if (!resumePending) send({ kind: 'pause-resume-pending', source, reason: 'game-not-foreground' });
@@ -268,10 +269,25 @@ function resumePause(source) {
   resetHotkeyPolling();
   escapeDown = escapeDown || (getKey(0x1b) & 0x8000) !== 0;
   f10Down = f10Down || (getKey(0x79) & 0x8000) !== 0;
+  chatAllDown = chatAllDown || (getKey(0x54) & 0x8000) !== 0;
+  chatTeamDown = chatTeamDown || (getKey(0x59) & 0x8000) !== 0;
   clearInputBuffers(getInput());
   restoreInput();
   lastForeground = true;
   send({ kind: 'pause-resumed', source, inputOnly: true, worldContinues: true });
+  return true;
+}
+function showResults() {
+  if (exitRequested || matchFinished) return false;
+  matchFinished = true;
+  paused = true;
+  resumePending = false;
+  updateGate();
+  retained.pauseClock();
+  globalThis.KARMA_LOCAL_PAUSED = true;
+  releaseInput();
+  clearInputBuffers(getInput());
+  send({ kind: 'results-ready', hwnd: ptr('0x548d50').readPointer().toString(), pid: Process.id });
   return true;
 }
 function latchExit(source) {
@@ -280,6 +296,8 @@ function latchExit(source) {
   resumePending = false;
   escapeDown = true;
   f10Down = true;
+  chatAllDown = true;
+  chatTeamDown = true;
   lastForeground = false;
   updateGate();
   try { releaseInput(); }
@@ -303,7 +321,7 @@ retained.listeners.push(Interceptor.attach(user32.getExportByName('PostQuitMessa
 // RPC runs on Frida's thread. Wake the game's message loop, then execute all
 // cursor/device/quit operations in WndProc or the native dispatcher hook.
 function menuCommand(command) {
-  if (!['resume', 'quit', 'pause'].includes(command)) throw new Error('Unknown menu command');
+  if (!['resume', 'quit', 'pause', 'results'].includes(command)) throw new Error('Unknown menu command');
   if (exitRequested) return { queued: false, exiting: true };
   commands.push(command);
   const hwnd = ptr('0x548d50').readPointer();
@@ -316,24 +334,33 @@ function drainCommands() {
   while (commands.length && !exitRequested) {
     const command = commands.shift();
     if (command === 'quit') requestExit('external-menu');
+    else if (command === 'results') showResults();
     else if (command === 'pause') requestPause('external-menu');
     else resumePause('external-menu');
   }
   if (resumePending && !exitRequested) resumePause('foreground-return');
 }
-function hotkeys(source, escape, f10) {
-  if (exitRequested) return;
+function hotkeys(source, escape, f10, chatAll, chatTeam) {
+  if (exitRequested || matchFinished) return;
   const allowEscape = escape === undefined ? false : polledPressAllowed(source, 0, escape);
   const allowF10 = f10 === undefined ? false : polledPressAllowed(source, 1, f10);
+  const allowChatAll = chatAll === undefined ? false : polledPressAllowed(source, 2, chatAll);
+  const allowChatTeam = chatTeam === undefined ? false : polledPressAllowed(source, 3, chatTeam);
   const newEscape = escape && !escapeDown && allowEscape;
   const newF10 = f10 && !f10Down && allowF10;
+  const newChatAll = chatAll && !chatAllDown && allowChatAll;
+  const newChatTeam = chatTeam && !chatTeamDown && allowChatTeam;
   if (escape !== undefined) escapeDown = escape;
   if (f10 !== undefined) f10Down = f10;
+  if (chatAll !== undefined) chatAllDown = chatAll;
+  if (chatTeam !== undefined) chatTeamDown = chatTeam;
   if (newEscape && !paused) requestPause(source, true);
   // The external menu owns resume. A delayed WM_KEYDOWN can follow an
   // async press and release (notably over RDP); it must not reopen input
   // while the menu is still visible.
   else if (newF10 && !paused) requestPause(source);
+  else if (newChatAll && !paused) requestPause(source, false, 'all');
+  else if (newChatTeam && !paused && globalThis.KARMA_LAN_CONFIG?.match?.mode === 'tdm') requestPause(source, false, 'team');
 }
 function serviceFrame() {
   reportDpiWindow();
@@ -345,10 +372,11 @@ function serviceFrame() {
     if (!cursorReleased) releaseInput();
     lastForeground = false;
     resetHotkeyPolling();
-    if (!paused) { escapeDown = false; f10Down = false; }
+    if (!paused) { escapeDown = false; f10Down = false; chatAllDown = false; chatTeamDown = false; }
     return;
   }
-  hotkeys('async-key', (getKey(0x1b) & 0x8000) !== 0, (getKey(0x79) & 0x8000) !== 0);
+  hotkeys('async-key', (getKey(0x1b) & 0x8000) !== 0, (getKey(0x79) & 0x8000) !== 0,
+    (getKey(0x54) & 0x8000) !== 0, (getKey(0x59) & 0x8000) !== 0);
   if (exitRequested || paused) return;
   if (!lastForeground) {
     if (cursorReleased) restoreInput();
@@ -367,7 +395,7 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
     const param = args[2].toInt32();
     const keyDown = this.message === 0x100 || this.message === 0x104;
     const keyUp = this.message === 0x101 || this.message === 0x105;
-    if ((keyDown || keyUp) && (param === 0x1b || param === 0x79)) {
+    if ((keyDown || keyUp) && [0x1b, 0x79, 0x54, 0x59].includes(param)) {
       const hwnd = ptr('0x548d50').readPointer();
       if (!hwnd.isNull() && args[0].equals(hwnd)) {
         // Consume both edges before the original online/menu handler sees
@@ -375,28 +403,40 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
         args[1] = ptr(0); // WM_NULL
         if (keyUp) {
           if (param === 0x1b) escapeDown = false;
-          else f10Down = false;
+          else if (param === 0x79) f10Down = false;
+          else if (param === 0x54) chatAllDown = false;
+          else chatTeamDown = false;
         } else if (!exitRequested && foreground().equals(hwnd)) {
           const repeat = (args[3].toUInt32() & 0x40000000) !== 0;
           if (repeat) {
             // Do not let a following async/DI poll turn this repeat into a
             // new edge. Only a release can rearm the key.
             if (param === 0x1b) escapeDown = true;
-            else f10Down = true;
+            else if (param === 0x79) f10Down = true;
+            else if (param === 0x54) chatAllDown = true;
+            else chatTeamDown = true;
           } else {
             hotkeys('window-key', param === 0x1b ? true : undefined,
-              param === 0x79 ? true : undefined);
+              param === 0x79 ? true : undefined,
+              param === 0x54 ? true : undefined, param === 0x59 ? true : undefined);
           }
         }
       }
     }
+    // TranslateMessage may already have queued a character for a consumed T/Y
+    // edge. Never pass it into the original online chat handler. External chat
+    // typing belongs to its own HWND; queued game key/character messages are
+    // discarded while local input is released.
+    const character = [0x102, 0x103, 0x106, 0x107].includes(this.message);
+    if ((keyDown || keyUp || character) && args[0].equals(ptr('0x548d50').readPointer()) &&
+        (paused || matchFinished || character && [0x54, 0x74, 0x59, 0x79].includes(param))) args[1] = ptr(0);
     if (this.message === MENU_MESSAGE) drainCommands();
     const inactive = (this.message === 0x06 && (param & 0xffff) === 0) ||
       (this.message === 0x1c && param === 0);
     if (inactive) {
       lastForeground = false;
       resetHotkeyPolling();
-      if (!paused && !exitRequested) { escapeDown = false; f10Down = false; }
+      if (!paused && !exitRequested) { escapeDown = false; f10Down = false; chatAllDown = false; chatTeamDown = false; }
       try { releaseInput(); }
       catch (error) { send({ kind: 'focus-release-warning', message: String(error) }); }
     }
@@ -473,14 +513,21 @@ retained.keyboardCallback = new NativeCallback(function (input) {
   if (result < 0 || input.isNull()) return result;
   keyboardFallback(input);
   const escape = input.add(0x40 + 0x01), f10 = input.add(0x40 + 0x44);
+  const chatAll = input.add(0x40 + 0x14), chatTeam = input.add(0x40 + 0x15);
   const escapeHeld = (escape.readU8() & 0x80) !== 0;
   const f10Held = (f10.readU8() & 0x80) !== 0;
+  const chatAllHeld = (chatAll.readU8() & 0x80) !== 0;
+  const chatTeamHeld = (chatTeam.readU8() & 0x80) !== 0;
   escape.writeU8(0);
   f10.writeU8(0);
+  chatAll.writeU8(0);
+  chatTeam.writeU8(0);
   const hwnd = ptr('0x548d50').readPointer();
   if (!hwnd.isNull() && foreground().equals(hwnd)) {
     hotkeys('directinput', escapeHeld || (getKey(0x1b) & 0x8000) !== 0,
-      f10Held || (getKey(0x79) & 0x8000) !== 0);
+      f10Held || (getKey(0x79) & 0x8000) !== 0,
+      chatAllHeld || (getKey(0x54) & 0x8000) !== 0,
+      chatTeamHeld || (getKey(0x59) & 0x8000) !== 0);
   }
   if (inputUnavailable()) clearInputBuffers(input);
   return result;
@@ -507,7 +554,7 @@ Memory.protect(gate, Process.pageSize, 'r-x');
 retained.listeners.push(Interceptor.attach(gate, { onEnter() { serviceFrame(); } }));
 Memory.patchCode(dispatcherCall, 5, code => code.writeByteArray(
   [0xe8, ...little32(gateAddress - (dispatcherCall.toUInt32() + 5))]));
-send({ kind: 'input-menu-ready', keys: { Escape: 'confirm-exit', F10: 'input-menu' },
+send({ kind: 'input-menu-ready', keys: { Escape: 'confirm-exit', F10: 'input-menu', T: 'all-chat', Y: 'team-chat-in-tdm' },
   sources: ['window-key', 'directinput', 'async-key', 'external-menu'], behavior: 'external-input-menu', mode: 'lan', pausesWorld: false,
   confirmation: true, nativeFrameGate: gate.toString(),
-  nativeClockGate: retained.clockPage.toString(), clockArithmetic: 'native-uint32', version: 10 });
+  nativeClockGate: retained.clockPage.toString(), clockArithmetic: 'native-uint32', version: 11 });

@@ -53,3 +53,42 @@ for(const file of ['input-lan.js','input-menu.js']) {
   }
 }
 console.log('PASS: startup/focus held keys, per-source release guards, fresh Escape confirmation/cancel, F10 isolation, repeat suppression.');
+
+{
+  const scope={require,Buffer,console,process:{argv:['node','fixture','client/Launcher/input-lan.js']}};
+  vm.runInNewContext(fixture.slice(0,end)+'\nglobalThis.makeHarness=harness;',scope);
+  const harness=()=>{const h=scope.makeHarness();h.context.KARMA_LAN_CONFIG={match:{mode:'tdm'}};return h;};
+  for(const [vk,scan,channel] of [[0x54,0x14,'all'],[0x59,0x15,'team']]){
+    const h=harness();h.s.held.add(vk);
+    for(let i=0;i<10;i++){h.frame();h.keyboard(scan,true);}
+    assert.equal(h.inspect().paused,false,'Startup held chat key cannot open a window');
+    assert.equal(h.bytes.get(0x5040+scan),0,'Startup held key is still removed from native buffers');
+    h.s.held.clear();h.frame();h.keyboard();h.s.held.add(vk);h.frame();
+    assert.equal(h.events.filter(e=>e.kind==='chat-requested').length,1);
+    assert.equal(h.events.find(e=>e.kind==='chat-requested').channel,channel);
+    h.command('resume');h.windowMessage(0x84a1);
+    for(let i=0;i<10;i++){h.frame();h.keyboard(scan,true);h.windowMessage(0x100,vk,0x40000000);}
+    assert.equal(h.inspect().paused,false,'Repeat/held opener cannot reopen resumed chat');
+    h.s.held.clear();h.frame();h.keyboard();h.windowMessage(0x101,vk,0xc0000000);
+    h.windowMessage(0x100,vk);assert.equal(h.events.filter(e=>e.kind==='chat-requested').length,2,'Fresh subsequent chat press works');
+    for(const activate of [false,true]){
+      const f=harness();f.frame();f.keyboard();f.s.fg=0x4000;
+      if(activate)f.windowMessage(6,0);else f.frame();
+      f.s.held.add(vk);f.s.fg=0x3000;
+      for(let i=0;i<10;i++){f.frame();f.keyboard(scan,true);}
+      assert.equal(f.inspect().paused,false,'Background-held chat key cannot act on focus return');
+    }
+    const di=harness();di.frame();
+    for(let i=0;i<10;i++){di.keyboard(scan,true);di.frame();}
+    assert.equal(di.inspect().paused,false,'An async release cannot arm first held DirectInput sample');
+    di.keyboard();di.keyboard(scan,true);assert.equal(di.inspect().paused,true);
+    const short=harness();short.s.held.add(0x1b);short.windowMessage(0x100,vk);
+    assert.equal(short.events.filter(e=>e.kind==='chat-requested').length,1,'Fresh short WM chat press works before first poll');
+    assert.equal(short.events.filter(e=>e.kind==='pause-requested').length,0,'WM chat does not import stale Escape');
+    const repeat=harness();repeat.windowMessage(0x100,vk,0x40000000);repeat.s.held.add(vk);repeat.frame();repeat.keyboard(scan,true);
+    assert.equal(repeat.inspect().paused,false,'Initial auto-repeat is not a fresh chat press');
+    const background=harness();background.s.fg=0x4000;background.windowMessage(0x100,vk);
+    assert.equal(background.inspect().paused,false);assert.equal(background.s.deliveredMessage,0,'Background targeted chat is consumed without activation');
+  }
+}
+console.log('PASS: T/Y startup held, independent poll arming, focus return, repeat suppression, fresh short presses and subsequent reopen.');

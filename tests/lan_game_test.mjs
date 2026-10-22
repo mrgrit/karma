@@ -260,3 +260,30 @@ assert.equal(lateShot.rpc.lanstatus().remoteShots,0,'Old retained shot must not 
 lateShot.rpc.lanreceive({...baseline,seq:3,shotSequence:41,shot:{...oldShot,id:41}});lateShot.tick();
 assert.equal(lateShot.rpc.lanstatus().remoteShots,1,'New shot after join must replay once');
 console.log('PASS late-join shot baseline suppresses historical shots and preserves new fire.');
+
+// Point is an encoded profile value consumed by the actual Shift row renderer,
+// distinct from K/D and the account's rank. Only server-confirmed values change it.
+const pointGame=create('host',{localPlayerId:'points-host',remotePlayerId:'points-guest',central:true,
+ local:{settings:{build:'karma290-central5'}}});
+assert.equal(pointGame.gm.add(0xfc8).readS32(),12345,'Local Point starts at encoded zero');
+assert.equal(pointGame.gm.add(0xfc8+0x98).readS32(),12345,'Remote Point starts at encoded zero');
+pointGame.gm.add(0xfc4).writeS32(8);pointGame.gm.add(0x145c).writeS32(777);
+const pointSnapshot={version:1,type:'match-snapshot',remainingSeconds:599,players:[
+ {playerId:'points-host',kills:1,deaths:0,points:25},
+ {playerId:'points-guest',kills:0,deaths:1,points:5}]};
+pointGame.rpc.lanreceive(pointSnapshot);pointGame.tick();
+assert.equal(pointGame.gm.add(0xfc8).readS32(),12370);
+assert.equal(pointGame.gm.add(0xfc8+0x98).readS32(),12350);
+assert.equal(pointGame.gm.add(0xfc4).readS32(),8,'Point update preserves account rank');
+assert.equal(pointGame.gm.add(0x145c).readS32(),777,'Do not write the guessed adjacent K/D word');
+assert.deepEqual(JSON.parse(JSON.stringify(pointGame.rpc.lanstatus().scores.map(p=>[p.kills,p.deaths,p.points]))),[[1,0,25],[0,1,5]]);
+pointGame.rpc.lanreceive(pointSnapshot);pointGame.tick();
+assert.equal(pointGame.gm.add(0xfc8).readS32(),12370,'Repeated snapshot does not add XP again');
+pointGame.rpc.lanreceive({...pointSnapshot,players:[{playerId:'points-host',kills:2,deaths:1,points:55}]});pointGame.tick();
+assert.equal(pointGame.rpc.lanstatus().scores[0].points,55,'Later confirmed total replaces the prior Point');
+for(const points of [-1,1.5,NaN,Infinity,1000000001]){
+ assert.throws(()=>pointGame.rpc.lanreceive({...pointSnapshot,players:[{playerId:'points-host',kills:0,deaths:0,points}]}),/Invalid/);
+}
+pointGame.rpc.lanreceive({...pointSnapshot,players:[{playerId:'points-host',kills:2,deaths:1}]});pointGame.tick();
+assert.equal(pointGame.rpc.lanstatus().scores[0].points,55,'Legacy snapshot cannot erase a confirmed Point');
+console.log('PASS encoded native Point initialization, server snapshot mapping, exact/idempotent totals, bounds and rank/KD-field separation.');

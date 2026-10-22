@@ -19,6 +19,10 @@ const startPath=path.join(support,'lan-start.json');
 const lobbyCommandPath=path.join(support,'lan-lobby-command.json'),lobbyResultPath=path.join(support,'lan-lobby-result.json');
 const logPath=path.join(support,'last-session.log');
 const lootHintPath=path.join(support,'loot-hint.json');
+const chatStatePath=path.join(support,'pause-chat-state.json');
+const chatMessages=[];let chatError='',chatErrorAt=0;
+const saveChat=()=>fs.writeFileSync(chatStatePath,JSON.stringify({gamePid:pid||0,mode:peer?.match?.mode||options.matchMode||'duel',messages:chatMessages,error:chatError,errorAt:chatErrorAt}));
+for(const file of fs.readdirSync(support))if(/^pause-chat-send-[a-z0-9-]+\.json$/i.test(file))try{fs.unlinkSync(path.join(support,file));}catch{}
 try{fs.unlinkSync(lootHintPath);}catch{}
 fs.writeFileSync(logPath,'');
 try{fs.unlinkSync(cancelPath);}catch{}
@@ -27,11 +31,14 @@ for(const file of [lobbyCommandPath,lobbyResultPath])try{fs.unlinkSync(file);}ca
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
 const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
 let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,connected=false,
-  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud,accountProfile={};
+  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud,accountProfile={},matchResult=null,resultFiles=[];
 const checkClosing=()=>{if(closing)throw Error('LAN 대전이 취소되었습니다.');};
+saveChat();
 const cleanMenu=()=>{
   clearInterval(pauseTimer);pauseTimer=null;
   if(pauseChild){try{pauseChild.kill();}catch{}pauseChild=null;}
+  for(const file of resultFiles)try{fs.unlinkSync(file);}catch{}
+  resultFiles=[];
 };
 const stop=async(reason,error=false)=>{
   if(closing)return;closing=true;
@@ -49,6 +56,12 @@ const stop=async(reason,error=false)=>{
 const keepAlive=setInterval(()=>{
   if(ended){clearInterval(keepAlive);return;}
   if(fs.existsSync(cancelPath))stop('LAN 대전을 종료했습니다.');
+  for(const file of fs.readdirSync(support).filter(f=>/^pause-chat-send-[a-z0-9-]+\.json$/i.test(f)).sort().slice(0,20)){
+    try{
+      const full=path.join(support,file),command=readJson(full);fs.unlinkSync(full);
+      if(closing||matchResult||!peer?.sendChat?.(command.channel,command.text,command.requestId))throw Error('채팅에 연결되어 있지 않습니다.');
+    }catch(error){chatError=String(error.message||error);chatErrorAt=Date.now();saveChat();}
+  }
   if(!closing&&fs.existsSync(startPath)){
     try{const command=readJson(startPath);fs.unlinkSync(startPath);
       if(!connected&&command.roomId===peer?.match?.roomId)peer.startMatch?.();
@@ -70,10 +83,11 @@ const keepAlive=setInterval(()=>{
   }
 },200);
 const openMenu=message=>{
-  if(pauseChild||!/^0x[0-9a-f]+$/i.test(message.hwnd||''))return;
+  if(matchResult||pauseChild||!/^0x[0-9a-f]+$/i.test(message.hwnd||''))return;
   const commandFile=path.join(support,'pause-lan-'+pid+'-'+Date.now()+'.json');
-  const child=spawnHelper(path.join(root,'KarmaLauncher.exe'),
-    ['--pause',commandFile,message.hwnd,String(pid),'--lan',...(message.confirmExit?['--confirm-exit']:[])],
+  const args=message.kind==='chat-requested'?['--chat',commandFile,message.hwnd,String(pid),message.channel]:
+    ['--pause',commandFile,message.hwnd,String(pid),'--lan',...(message.confirmExit?['--confirm-exit']:[])];
+  const child=spawnHelper(path.join(root,'KarmaLauncher.exe'),args,
     {cwd:root,stdio:'ignore',windowsHide:false});
   pauseChild=child;
   let childExited=false;
@@ -87,6 +101,33 @@ const openMenu=message=>{
     try{fs.unlinkSync(commandFile);}catch{}
     try{await script.exports.menucommand(action);}catch(error){log('pause-command-error',{message:String(error)});}
   },100);
+};
+const openResults=()=>{
+  if(!matchResult||closing)return;
+  cleanMenu();closeCoinHud?.();closeCoinHud=null;
+  clearTimeout(startupTimer);clearTimeout(validationTimer);
+  const key=pid+'-'+Date.now(),commandFile=path.join(support,'pause-result-command-'+key+'.json');
+  const dataFile=path.join(support,'pause-result-data-'+key+'.json');
+  resultFiles=[commandFile,dataFile];
+  fs.writeFileSync(dataFile,JSON.stringify({result:matchResult,localPlayerId:peer.playerId}));
+  const child=spawnHelper(path.join(root,'KarmaLauncher.exe'),['--results',commandFile,dataFile,String(pid)],{cwd:root,stdio:'ignore',windowsHide:false});
+  pauseChild=child;let childExited=false;
+  child.on('exit',()=>{childExited=true;});
+  child.on('error',error=>{log('results-helper-error',{message:String(error)});childExited=true;});
+  status('results','대전 종료 · 결과를 확인한 뒤 퇴장을 눌러 주세요.',{result:matchResult});
+  log('results-opened',{matchId:matchResult.id});
+  pauseTimer=setInterval(()=>{
+    let action;try{action=readJson(commandFile).action;}catch{}
+    if(action==='quit'){cleanMenu();stop('대전 결과를 확인하고 퇴장했습니다.');}
+    else if(childExited){cleanMenu();stop('결과 창이 닫혀 대전을 종료했습니다.');}
+  },100);
+};
+const finishMatch=async(result)=>{
+  if(matchResult||closing)return;
+  matchResult=result;cleanMenu();closeCoinHud?.();closeCoinHud=null;
+  clearTimeout(startupTimer);clearTimeout(validationTimer);
+  status('results','대전 종료 · 결과 화면 준비 중…',{result});
+  if(rpcReady)try{await script.exports.menucommand('results');}catch(error){stop('결과 화면을 준비하지 못했습니다. '+error,true);}
 };
 const queued=[];
 const queuedShotKeys=new Map();
@@ -110,9 +151,15 @@ try{
   peer=await (central?createCentralPeer:createLanPeer)({
     role:options.role,host:options.host,port:options.port||29020,code:String(options.code),config,
     maxPlayers:options.maxPlayers||2,mode:options.matchMode||'duel',manualStart:central,roomId:options.roomId,roomName:options.roomName,
+    killLimit:options.killLimit,roundWinLimit:options.roundWinLimit,timeLimitSeconds:options.timeLimitSeconds,
     onStatus:detail=>{
-      log('lan-status',detail);
       const phase=detail.phase||detail.type||detail.status;
+      if(phase==='chat'){
+        if(!chatMessages.some(m=>m.id===detail.id)){const {type,phase,...item}=detail;chatMessages.push(item);if(chatMessages.length>80)chatMessages.shift();saveChat();}
+        return;
+      }
+      if(phase==='chat-denied'){chatError=detail.message;chatErrorAt=Date.now();saveChat();return;}
+      log('lan-status',detail);
       if(phase==='lobby-updated'||phase==='lobby-update-denied'){
         fs.writeFileSync(lobbyResultPath,JSON.stringify({requestId:detail.requestId,ok:phase==='lobby-updated',message:detail.message||'',ready:detail.ready,config:detail.config}));
       }
@@ -121,17 +168,14 @@ try{
         (detail.manualStart?'장비 설정 후 준비 완료를 누르세요.':'정원이 모이면 자동 시작합니다.'),
         {roomId:detail.roomId,roomName:detail.roomName||options.roomName,localPlayerId:detail.localPlayerId||peer?.playerId,code:detail.code||options.code,players:detail.players||1,maxPlayers:detail.maxPlayers||options.maxPlayers||2,
           mode:detail.mode||options.matchMode,hostId:detail.hostId,isHost:detail.isHost??(options.role==='host'),manualStart:detail.manualStart===true,
-          canStart:detail.canStart===true,startReason:detail.startReason||'',members:detail.members||[],gameFee:detail.gameFee||0});
+          canStart:detail.canStart===true,startReason:detail.startReason||'',members:detail.members||[],gameFee:detail.gameFee||0,
+          killLimit:detail.killLimit,roundWinLimit:detail.roundWinLimit,timeLimitSeconds:detail.timeLimitSeconds});
       if(phase==='round-ended')status('playing','라운드 '+detail.round+' 종료 · '+detail.roundWins.join(' : ')+' · 다음 라운드 준비');
       if(phase==='round-start')status('playing','라운드 '+detail.round+' · 한 팀 전멸 시 종료 · F10 메뉴');
       if(phase==='match-ended'){
-        const result=detail.result||{},winner=result.winnerIds?.includes(peer?.playerId);
-        const label=result.draw?'무승부':winner?'승리':'패배';
-        const score=result.scores?.[peer?.playerId]??0,other=result.scores?.[peer?.remotePlayerId]??0;
-        const scoreText=result.mode==='tdm'?'라운드 '+(result.roundWins||result.teamScores).join(' : '):'내 킬 '+score;
-        stop('대전 종료 · '+label+' · '+scoreText+' · 전적을 저장했습니다.');
+        finishMatch(detail.result||{});
       }
-      if(phase==='disconnected'&&connected&&!closing)stop('상대와의 연결이 끊겨 대전을 종료했습니다.',true);
+      if(phase==='disconnected'&&connected&&!closing&&!matchResult)stop('상대와의 연결이 끊겨 대전을 종료했습니다.',true);
     },
     onProfile:profile=>{
       accountProfile=profile;
@@ -141,7 +185,7 @@ try{
       });
     },
     onMessage:message=>{
-      if(closing)return;
+      if(closing||matchResult)return;
       if(message.type==='leave'){stop('상대가 방을 나갔습니다.');return;}
       if(rpcReady)script.exports.lanreceive(message).catch(error=>stop(String(error),true));
       else {
@@ -174,7 +218,7 @@ try{
   const bundled=path.join(root,'Runtime/node_modules/frida/build/src/frida.js');
   const frida=await import(pathToFileURL(fs.existsSync(bundled)?bundled:path.resolve(root,runtime.fridaModule)).href);
   checkClosing();device=await frida.getLocalDevice();checkClosing();
-  pid=await device.spawn([exe],{cwd:game});checkClosing();
+  pid=await device.spawn([exe],{cwd:game});saveChat();checkClosing();
   startupTimer=setTimeout(()=>stop('게임 초기화가 30초 안에 완료되지 않았습니다.',true),30000);
   if(runtime.validationSeconds>0&&runtime.validationSeconds<=120)
     validationTimer=setTimeout(()=>stop('테스트 제한 시간이 끝났습니다.'),runtime.validationSeconds*1000);
@@ -193,6 +237,8 @@ try{
     if(message.type==='error'){stop(message.description,true);return;}
     if(message.type!=='send')return;
     const payload=message.payload;
+    if(payload.kind==='results-ready'){log('agent',payload);openResults();return;}
+    if(matchResult&&payload.kind!=='exit-requested')return;
     if(payload.event==='lan-outbound'){try{peer.send(payload.message);}catch(error){stop(String(error),true);}return;}
     if(payload.event==='lan-damage-proof'){
       if(central)try{peer.send({type:'damage-proof',proof:payload.proof});}catch(error){stop(String(error),true);}
@@ -203,10 +249,10 @@ try{
     }
     log('agent',payload);
     if(payload.event==='offline-player-death')status('playing',peer.match?.mode==='tdm'?'전사 · 팀전은 다음 라운드에 다시 등장합니다.':peer.match?.mode==='dm'?'전사 · 10초 후 랜덤 위치에서 다시 등장합니다.':'전사 · 잠시 후 다시 등장합니다.');
-    if(payload.event==='lan-local-respawn')status('playing','재등장 · Tab 점수판 · F10 메뉴 · Esc 종료 확인');
+    if(payload.event==='lan-local-respawn')status('playing','재등장 · Shift 점수판 · F10 메뉴 · Esc 종료 확인');
     if(payload.kind==='exit-requested')stop('LAN 대전을 종료했습니다.');
-    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);if(!closeCoinHud)closeCoinHud=startCoinHud({root,pid,host:options.host,port:options.port,log});status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료 확인');}
-    if(payload.kind==='pause-requested')openMenu(payload);
+    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);if(!closeCoinHud)closeCoinHud=startCoinHud({root,pid,host:options.host,port:options.port,log});status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Shift 점수 · F10 메뉴 · Esc 종료 확인');}
+    if(payload.kind==='pause-requested'||payload.kind==='chat-requested')openMenu(payload);
   });
   const done=new Promise(resolve=>session.detached.connect((reason,crash)=>{
     ended=true;closing=true;clearTimeout(startupTimer);clearTimeout(validationTimer);
@@ -217,6 +263,7 @@ try{
   await script.load();checkClosing();await script.exports.compatibilitystatus();checkClosing();
   while(queued.length){await script.exports.lanreceive(queued.shift());checkClosing();}
   rpcReady=true;
+  if(matchResult)await script.exports.menucommand('results');
   checkClosing();await device.resume(pid);log('game-started',{pid,exe,lan:true,role:options.role});
   await done;
 }catch(error){
@@ -230,4 +277,5 @@ try{
   closeCoinHud?.();
   try{fs.unlinkSync(lootHintPath);}catch{}
   try{fs.unlinkSync(settingsPath);}catch{}
+  try{fs.unlinkSync(chatStatePath);}catch{}
 }

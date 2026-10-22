@@ -13,7 +13,8 @@ using System.Web.Script.Serialization;
 namespace KarmaLocal {
   public sealed class RoomEntry {
     public string RoomId,Code,RoomName,HostName,MapName,Mode,State,Build;
-    public int Map,Players,MaxPlayers,GameFee;
+    public int Map,Players,MaxPlayers,GameFee,KillLimit,RoundWinLimit,TimeLimitSeconds;
+    public string Limits {get{return (Mode=="tdm"?RoundWinLimit+"승":KillLimit+"킬")+" / "+(TimeLimitSeconds/60)+"분";}}
     public bool Joinable;
     public bool CanJoin { get { return Joinable&&Build=="karma290-central5"; } }
     public string ModeName { get { return Mode=="dm"?"개인 데스매치":Mode=="tdm"?"팀 전멸전":"1:1 대전"; } }
@@ -32,6 +33,7 @@ namespace KarmaLocal {
       var room=new RoomEntry{RoomId=Text(d,"roomId"),Code=Text(d,"code"),RoomName=Text(d,"roomName"),HostName=Text(d,"hostName"),
         MapName=Text(d,"mapName"),Mode=Text(d,"mode"),State=Text(d,"state"),Build=Text(d,"build"),
         Map=Number(d,"map"),Players=Number(d,"players"),MaxPlayers=Number(d,"maxPlayers"),GameFee=Number(d,"gameFee"),
+        KillLimit=Number(d,"killLimit"),RoundWinLimit=Number(d,"roundWinLimit"),TimeLimitSeconds=Number(d,"timeLimitSeconds"),
         Joinable=d.TryGetValue("joinable",out flag)&&flag is bool&&(bool)flag};
       if(room.RoomId.Length<1||room.RoomId.Length>96||room.Code.Length!=6||room.Code.Any(c=>c<'0'||c>'9')||
         room.Map<0||room.Map>255||room.Players<1||room.MaxPlayers<2||room.MaxPlayers>8||room.Players>room.MaxPlayers||
@@ -145,7 +147,7 @@ namespace KarmaLocal {
     }
     void UpdateInfo(){
       var room=SelectedRoom;
-      info.Text=room==null?message:(room.RoomName==""?room.HostName+"의 방":room.RoomName)+" · "+room.MapName+" · "+room.ModeName+" · "+room.StateName+"\n"+
+      info.Text=room==null?message:(room.RoomName==""?room.HostName+"의 방":room.RoomName)+" · "+room.MapName+" · "+room.ModeName+" · "+room.Limits+" · "+room.StateName+"\n"+
         (room.CanJoin?(room.GameFee==100?"대전 참가 시 1 KARMA · 대기실 입장은 무료":"장비 확인 후 참가합니다."):
           room.Build!="karma290-central5"?"방장과 참가자 모두 최신 클라이언트로 실행해 주세요.":"현재 이 방에는 참가할 수 없습니다. 다른 방을 선택하거나 새로고침하세요.");
     }

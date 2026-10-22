@@ -31,6 +31,7 @@ try {
   const c={i,role:i?'join':'host',events:[],pending:[]};clients.push(c);
   c.peer=await createCentralPeer({role:c.role,host:'127.0.0.1',port:server.port,secure:false,identityPath:null,
    identity:{authToken:server.auth.issueSession(account).authToken},code:'876123',config,maxPlayers:2,mode:'duel',manualStart:true,
+   onStatus:x=>{if(x.phase==='match-ended'){c.result=x.result;c.script.exports.menucommand('results').catch(e=>failure=e);}},
    onMessage:x=>{if(stopping||c.expectExit||c.ended)return;if(c.loaded)c.script.exports.lanreceive(x).catch(e=>{if(!stopping&&!c.expectExit&&!c.ended)failure=e;});else c.pending.push(x);}});
  }
  await wait('two lobby seats',()=>clients[0].peer.match.members?.length===2);
@@ -51,6 +52,7 @@ try {
    source+='\n(()=>{'+code+'})();\n';
   }
   source+=`\nrpc.exports.testkey=key=>{globalThis.KARMA_TEST_HELD=key;};`;
+  source+=`\nrpc.exports.resultstate=()=>({gate:KARMA_LOCAL_INPUT_NATIVE.flagPage.readU8(),clock:KARMA_LOCAL_INPUT_NATIVE.clockState.readU8(),paused:KARMA_LOCAL_PAUSED,inputPaused:KARMA_LOCAL_INPUT_PAUSED});`;
   c.script=await c.session.createScript(source);
   c.script.message.connect(m=>{
    if(m.type==='error'){failure=Error(m.description);log({event:'script-error',client:c.i,...m});return;}
@@ -80,8 +82,15 @@ try {
  await wait('confirmed exit',()=>c.ended);
  assert(c.events.some(e=>e.kind==='exit-requested'&&e.confirmation));
  assert(!clients[1].ended,'peer native process remains alive before transport cleanup');
- log({event:'PASS',map:7,players:2,startupHeldEscape:true,confirmationCancel:true,f10:true,confirmedExit:true});
- console.log('PASS original-engine Factory duel: both ready, first-frame held Esc ignored, confirmation/cancel preserves two clients, F10 and explicit exit.');
+ c.peer.close();const survivor=clients[1];
+ await wait('server result freezes native game',()=>survivor.result&&survivor.events.some(e=>e.kind==='results-ready'));
+ assert.deepEqual(await survivor.script.exports.resultstate(),{gate:1,clock:1,paused:true,inputPaused:true});
+ await survivor.script.exports.menucommand('resume');await survivor.script.exports.testkey(0x79);
+ await delay(2000);assert(!survivor.ended,'result waits for explicit leave');
+ assert.deepEqual(await survivor.script.exports.resultstate(),{gate:1,clock:1,paused:true,inputPaused:true});
+ survivor.expectExit=true;await survivor.script.exports.menucommand('quit');await wait('result leave exits',()=>survivor.ended);
+ log({event:'PASS',map:7,players:2,startupHeldEscape:true,confirmationCancel:true,f10:true,confirmedExit:true,serverResultWaitsForLeave:true});
+ console.log('PASS original-engine Factory duel: startup/confirmation/F10, server forfeit result freezes world/clock/input, accidental resume ignored, explicit result Leave exits.');
 }catch(e){log({event:'FAIL',message:String(e)});console.error(e);process.exitCode=1;}
 finally{
  stopping=true;

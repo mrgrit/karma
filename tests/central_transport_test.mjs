@@ -81,8 +81,10 @@ try{
   wire.write(JSON.stringify({type:'match-ended',version:2,result:{winnerIds:['one'],draw:false,scores:{one:10,two:3}}})+'\n');
   await new Promise(resolve=>setTimeout(resolve,30));
   assert.equal(statuses.find(x=>x.phase==='match-ended').result.scores.one,10);
-  assert.equal(inbound.at(-1).type,'leave');
-  peer.close();await once(wire,'close');
+  assert(!inbound.some(x=>x.type==='leave'),'finished match must not immediately close the local game');
+  assert.equal(peer.connected,false);
+  assert(!statuses.some(x=>x.phase==='disconnected'),'normal server shutdown is not a disconnect error');
+  peer.close();if(!wire.destroyed)await once(wire,'close');
   console.log('PASS central adapter: auth required, state coalescing, ordered damage/death, server control conversion, clean close');
 }finally{
   peer?.close();wire?.destroy();await new Promise(resolve=>server.close(resolve));

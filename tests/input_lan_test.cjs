@@ -9,6 +9,22 @@ const scope={require,Buffer,console,process:{argv:['node','fixture',process.argv
 vm.runInNewContext(fixture.slice(0,end)+'\nglobalThis.makeHarness=harness;',scope);
 const harness=scope.makeHarness;
 
+// A finished match is the only LAN menu that freezes simulation. It cannot
+// resume through focus changes, queued Continue, Esc, F10 or duplicate results.
+for(const alreadyPaused of [false,true]){
+  const h=harness();h.frame();if(alreadyPaused){h.command('pause');h.windowMessage(0x84a1);}
+  h.command('results');h.windowMessage(0x84a1);
+  assert.equal(h.retained.flagPage.readU8(),1);assert.equal(h.retained.clockState.readU8(),1);
+  assert.equal(h.context.KARMA_LOCAL_PAUSED,true);assert.equal(h.s.cursor,0);assert.equal(h.s.quits,0);
+  const clock=h.clock(),acquired=h.acquired();
+  h.command('resume');h.command('results');h.windowMessage(0x84a1);
+  h.s.rawTick+=1800000;h.s.held.add(0x1b);h.frame();h.windowMessage(0x100,0x79);
+  h.s.fg=0x4000;h.frame();h.s.fg=0x3000;h.frame();h.keyboard(0x11,true);h.mouse();
+  assert.equal(h.clock(),clock);assert.equal(h.acquired(),acquired);assert.equal(h.s.cursor,0);
+  assert.equal(h.events.filter(x=>x.kind==='results-ready').length,1);assert.equal(h.s.quits,0);
+  h.command('quit');h.windowMessage(0x84a1);assert.equal(h.s.quits,1);
+}
+
 {
   const h=harness();h.frame();
   const ready=h.events.find(e=>e.kind==='input-menu-ready');
@@ -116,3 +132,53 @@ for(const origin of ['escape','rpc','native']) {
 }
 assert.throws(()=>harness('gate'),/Unsupported game dispatcher call/);
 console.log('PASS: LAN native frame/clock continuity, independent input pause flag, no world-pause callback, zero polling without reacquire, focus-loss release/foreground recovery, stable cursor counts, short F10/Escape handling and permanent exit release.');
+
+for(const mode of ['duel','dm','tdm'])for(const [vk,scan,channel] of [[0x54,0x14,'all'],[0x59,0x15,'team']])for(const source of ['window','async','directinput']){
+  const h=harness();h.context.KARMA_LAN_CONFIG={match:{mode}};h.frame();h.keyboard();
+  if(source==='window')h.windowMessage(0x100,vk);
+  else if(source==='async'){h.s.held.add(vk);h.frame();}
+  else h.keyboard(scan,true);
+  const allowed=channel==='all'||mode==='tdm';
+  assert.equal(h.inspect().paused,allowed,mode+'/'+channel+'/'+source);
+  assert.equal(h.events.filter(e=>e.kind==='pause-requested').length,0,'Chat does not open the pause dialog');
+  assert.equal(h.events.filter(e=>e.kind==='chat-requested').length,allowed?1:0);
+  assert.equal(h.s.quits,0);
+  if(source==='window')assert.equal(h.s.deliveredMessage,0,'Native WM chat shortcut is consumed');
+  if(source==='directinput')assert.equal(h.bytes.get(0x5040+scan),0,'Native DI chat shortcut is consumed even for disabled team chat');
+  h.windowMessage(0x102,vk+32);assert.equal(h.s.deliveredMessage,0,'Already-translated chat character is consumed');
+  if(!allowed)continue;
+  const event=h.events.find(e=>e.kind==='chat-requested');
+  assert.equal(event.channel,channel);assert.equal(event.hwnd,'0x3000');assert.equal(event.pid,12345);
+  assert.equal(event.inputOnly,true);assert.equal(event.worldContinues,true);
+  assert.equal(h.context.KARMA_LOCAL_INPUT_PAUSED,true);assert.equal(h.context.KARMA_LOCAL_PAUSED,false);
+  assert.equal(h.retained.flagPage.readU8(),0);assert.equal(h.retained.clockState.readU8(),0);
+  const acquired=h.acquired(),keyboardCalls=h.s.keyboardNativeCalls;
+  for(let i=0;i<10;i++){
+    h.s.rawTick+=100;h.frame();h.keyboard(0x11,true);h.mouse();
+    h.windowMessage(0x100,0x57);assert.equal(h.s.deliveredMessage,0,'Queued movement key stays out of original WndProc');
+    h.windowMessage(0x102,0x77);assert.equal(h.s.deliveredMessage,0,'Queued typed character stays out of original WndProc');
+  }
+  assert.equal(h.clock(),2000,'World clock continues while chat is open');
+  assert.equal(h.acquired(),acquired);assert.equal(h.s.keyboardNativeCalls,keyboardCalls);
+  assert.equal(h.bytes.get(0x5051),0);assert.equal(h.s.cursor,0);
+  // Cancel/send uses the same asynchronous, foreground-safe resume contract.
+  h.s.fg=0x4000;h.command('resume');h.windowMessage(0x84a1);
+  assert.equal(h.inspect().resumePending,true);assert.equal(h.s.cursor,0);
+  h.s.fg=0x3000;h.frame();assert.equal(h.inspect().paused,false);
+  assert.equal(h.context.KARMA_LOCAL_INPUT_PAUSED,false);assert.equal(h.s.cursor,-2);
+  h.frame();h.keyboard(scan,true);assert.equal(h.events.filter(e=>e.kind==='chat-requested').length,1,'Held opener cannot reopen on resume');
+}
+{
+  const h=harness();h.context.KARMA_LAN_CONFIG={match:{mode:'tdm'}};h.frame();h.keyboard();
+  h.s.held.add(0x54);h.frame();h.s.held.clear();h.frame();
+  h.windowMessage(0x100,0x54);h.windowMessage(0x100,0x59);h.windowMessage(0x104,0x79);
+  assert.equal(h.events.filter(e=>e.kind==='chat-requested').length,1,'Delayed/mixed WM edges cannot spawn another window');
+  assert.equal(h.events.filter(e=>e.kind==='pause-requested').length,0);
+  assert.equal(h.inspect().paused,true);assert.equal(h.s.cursor,0);
+  h.command('results');h.windowMessage(0x84a1);
+  const clock=h.clock();h.command('resume');h.windowMessage(0x84a1);h.s.rawTick+=10000;
+  for(const key of [0x54,0x59,0x1b,0x79]){h.windowMessage(0x101,key);h.windowMessage(0x100,key);}
+  assert.equal(h.events.filter(e=>e.kind==='chat-requested').length,1,'Results cannot reopen chat');
+  assert.equal(h.retained.flagPage.readU8(),1);assert.equal(h.clock(),clock);assert.equal(h.s.cursor,0);
+}
+console.log('PASS: T all/Y team chat routing across WM/async/DI, disabled Y absorption, isolated typing, continuing world clock, foreground-safe resume, duplicate requests and terminal results.');

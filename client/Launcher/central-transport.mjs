@@ -34,7 +34,7 @@ export function writeIdentity(filename,value){
 }
 export async function createCentralPeer({
   role,host='192.168.12.100',port=29020,code,config,maxPlayers=2,mode='duel',
-  secure=true,caFile=defaultCa,manualStart=false,roomId,roomName,
+  secure=true,caFile=defaultCa,manualStart=false,roomId,roomName,killLimit,roundWinLimit,timeLimitSeconds,
   identityPath=identityPathFor(host,port),identity=readIdentity(identityPath),
   onMessage=()=>{},onStatus=()=>{},onProfile=()=>{},onIdentity=()=>{},
 }={}){
@@ -97,6 +97,11 @@ export async function createCentralPeer({
     }
     if(message.type==='lobby-update-denied'){report({phase:'lobby-update-denied',...message});return;}
     if(message.type==='profile'){profile(message.profile);return;}
+    if(message.type==='chat'||message.type==='chat-denied'){
+      if(!welcomed)return;
+      if(message.type==='chat'&&(message.roomId!==match.roomId||typeof message.id!=='string'||typeof message.name!=='string'||typeof message.text!=='string'||message.text.length>200||!['all','team'].includes(message.channel)))throw Error('Invalid chat message');
+      report({phase:message.type,...message});return;
+    }
     if(message.type==='peer-ready'){
       if(!welcomed||settled||!Array.isArray(message.peers)||message.peers.length<1||message.peers.length>7||!message.remoteHello)throw Error('잘못된 참가자 목록입니다.');
       peers=message.peers.length===1&&!message.peers[0].playerId?[message.remoteHello]:message.peers;
@@ -153,7 +158,12 @@ export async function createCentralPeer({
       onMessage({version:1,type:'peer-left',playerId:message.playerId});return;
     }
     if(message.type==='room-closed'||message.type==='room-ended'||message.type==='match-ended'){
-      if(message.type==='match-ended')report({phase:'match-ended',result:message.result});
+      if(message.type==='match-ended'){
+        // The server intentionally closes the finished match connection.
+        // Keep the local game/result screen alive until the player leaves.
+        closed=true;connected=false;clearTimeout(handshake);clearInterval(flushTimer);pendingState=null;
+        report({phase:'match-ended',result:message.result});socket.end();return;
+      }
       onMessage({version:1,type:'leave',reason:message.reason||'peer-left'});return;
     }
     if(message.type==='pong')return;
@@ -163,7 +173,8 @@ export async function createCentralPeer({
   socket.once(secure?'secureConnect':'connect',()=>{
     report({phase:'connecting',server:host});
     write({type:'hello',version:2,op:role==='host'?'create':'join',code,
-      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,...(roomId?{roomId}:{}),...(roomName?{roomName}:{})});
+      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,...(roomId?{roomId}:{}),...(roomName?{roomName}:{}),
+      ...(role==='host'?{killLimit,roundWinLimit,timeLimitSeconds}:{})});
   });
   socket.on('data',chunk=>{
     try{
@@ -184,6 +195,11 @@ export async function createCentralPeer({
     ready,port,
     startMatch(){return welcomed&&!connected&&!closed?write({type:'start-match',roomId:match.roomId}):false;},
     updateLobby(update){return welcomed&&!connected&&!closed?write({type:'lobby-update',...update}):false;},
+    sendChat(channel,text,requestId=crypto.randomUUID()){
+      if(!welcomed||closed)return false;
+      if(!['all','team'].includes(channel)||typeof text!=='string'||text.length<1||text.length>200)throw Error('채팅은 1~200자로 입력해 주세요.');
+      return write({type:'chat-send',requestId,channel,text});
+    },
     get connected(){return connected;},get effectiveConfig(){return effectiveConfig;},
     get peers(){return peers;},get slot(){return slot;},get team(){return team;},get match(){return match;},
     get playerId(){return ownId;},get remotePlayerId(){return remoteId;},get code(){return roomCode;},

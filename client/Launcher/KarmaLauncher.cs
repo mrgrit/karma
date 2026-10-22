@@ -71,12 +71,12 @@ namespace KarmaLocal {
   }
   public sealed class LanSetup : Form {
     public string Host="",Code="",RoomName="";
-    public int Port=29020,MaxPlayers=2;
+    public int Port=29020,MaxPlayers=2,KillLimit=10,RoundWinLimit=5,TimeLimitSeconds=600;
     public string MatchMode="duel";
     public string AddressDisplay {get{return address.Text;}}
     readonly TextBox address,code,roomName;
     public LanSetup(bool host,string support) {
-      Text=host?"중앙 서버 · 방 만들기":"중앙 서버 · 참가";ClientSize=new Size(520,630);
+      Text=host?"중앙 서버 · 방 만들기":"중앙 서버 · 참가";ClientSize=new Size(560,800);
       AutoScaleDimensions=new SizeF(96F,96F);AutoScaleMode=AutoScaleMode.Dpi;Font=new Font("Malgun Gothic",10);
       FormBorderStyle=FormBorderStyle.Sizable;StartPosition=FormStartPosition.CenterParent;
       MaximizeBox=false;MinimizeBox=false;
@@ -112,7 +112,14 @@ namespace KarmaLocal {
         panel.Controls.Add(new Label{Text="대전 방식",AutoSize=true});panel.Controls.Add(matchMode);
         panel.Controls.Add(new Label{Text="개인전 최대 인원",AutoSize=true});panel.Controls.Add(capacity);
       }
-      matchMode.SelectedIndexChanged+=(s,e)=>{capacity.Enabled=matchMode.SelectedIndex==2;};
+      var killLimit=new NumericUpDown{Name="KillLimit",Minimum=1,Maximum=30,Value=10,Width=160};
+      var roundLimit=new NumericUpDown{Name="RoundWinLimit",Minimum=1,Maximum=10,Value=5,Width=160};
+      var timeLimit=new NumericUpDown{Name="TimeLimitMinutes",Minimum=1,Maximum=30,Value=10,Width=160};
+      var goalLabel=new Label{Text="목표 킬 (1~30킬)",AutoSize=true};
+      var goals=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,Margin=new Padding(0,0,0,12)};
+      goals.Controls.Add(killLimit);goals.Controls.Add(roundLimit);roundLimit.Visible=false;
+      if(host){panel.Controls.Add(goalLabel);panel.Controls.Add(goals);panel.Controls.Add(new Label{Text="제한 시간 (1~30분)",AutoSize=true});panel.Controls.Add(timeLimit);}
+      matchMode.SelectedIndexChanged+=(s,e)=>{capacity.Enabled=matchMode.SelectedIndex==2;bool team=matchMode.SelectedIndex==1;killLimit.Visible=!team;roundLimit.Visible=team;goalLabel.Text=team?"목표 라운드 승수 (1~10승)":"목표 킬 (1~30킬)";};
       panel.Controls.Add(new Label{Text=host?"최소 인원이 모이고 모두 준비 완료하면 방장이 시작합니다.\n팀전: 짝수 인원 · 양끝 시작 · 라운드 종료 후 부활\n개인전: 사망 10초 후 랜덤 부활":"대기실에 입장한 뒤 장비를 설정하고 준비 완료를 누르세요.",
         AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,0,0,18)});
       var buttons=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};
@@ -130,6 +137,7 @@ namespace KarmaLocal {
         Host=ip.ToString();Code=code.Text;RoomName=roomName.Text.Trim();
         MatchMode=matchMode.SelectedIndex==1?"tdm":matchMode.SelectedIndex==2?"dm":"duel";
         MaxPlayers=MatchMode=="tdm"?8:MatchMode=="dm"?Convert.ToInt32(capacity.SelectedItem):2;
+        KillLimit=(int)killLimit.Value;RoundWinLimit=(int)roundLimit.Value;TimeLimitSeconds=(int)timeLimit.Value*60;
         try{File.WriteAllText(serverPath,serializer.Serialize(new Dictionary<string,object>{{"host",Host},{"port",Port}}),Encoding.UTF8);}
         catch(Exception ex){MessageBox.Show(this,"서버 주소를 저장할 수 없습니다.\n"+ex.Message);return;}
         DialogResult=DialogResult.OK;Close();
@@ -150,29 +158,31 @@ namespace KarmaLocal {
     readonly Func<string,bool,Task> requestReady;
     readonly Func<string,Task> changeEquipment;
     readonly Action leave;
+    readonly ChatPanel chat;
     string roomId="";
     bool dismissing,busy,selfReady;
     Dictionary<string,object> lastData;
     static string Read(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)?Convert.ToString(v):"";}
     static bool Flag(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)&&v is bool&&(bool)v;}
-    public LobbyWindow(Action<string> startMatch,Func<string,bool,Task> ready,Func<string,Task> equipmentChange,Action leaveRoom) {
+    public LobbyWindow(Action<string> startMatch,Func<string,bool,Task> ready,Func<string,Task> equipmentChange,Action leaveRoom,string support=null) {
       requestStart=startMatch;requestReady=ready;changeEquipment=equipmentChange;leave=leaveRoom;
-      Text="카르마 · 대기실";ClientSize=new Size(660,610);MinimumSize=new Size(540,540);
+      Text="카르마 · 대기실";ClientSize=new Size(720,820);MinimumSize=new Size(540,600);
       AutoScaleDimensions=new SizeF(96F,96F);AutoScaleMode=AutoScaleMode.Dpi;
       StartPosition=FormStartPosition.CenterParent;Font=new Font("Malgun Gothic",11);
       BackColor=Color.FromArgb(21,29,35);ForeColor=Color.White;MinimizeBox=false;MaximizeBox=false;
-      var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Padding=new Padding(22)};
+      var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Padding=new Padding(22)};
       panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-      panel.RowStyles.Add(new RowStyle(SizeType.Absolute,94));panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+      panel.RowStyles.Add(new RowStyle(SizeType.Absolute,94));panel.RowStyles.Add(new RowStyle(SizeType.Percent,35));panel.RowStyles.Add(new RowStyle(SizeType.Percent,65));
       panel.RowStyles.Add(new RowStyle(SizeType.Absolute,108));panel.RowStyles.Add(new RowStyle(SizeType.Absolute,48));panel.RowStyles.Add(new RowStyle(SizeType.Absolute,58));Controls.Add(panel);
       title=new Label{Dock=DockStyle.Fill,Font=new Font("Malgun Gothic",13,FontStyle.Bold),AutoEllipsis=true};panel.Controls.Add(title,0,0);
       members=new ListBox{Dock=DockStyle.Fill,IntegralHeight=false,BackColor=Color.FromArgb(30,40,48),ForeColor=Color.White,BorderStyle=BorderStyle.FixedSingle};panel.Controls.Add(members,0,1);
-      info=new Label{Dock=DockStyle.Fill,Padding=new Padding(0,12,0,0),ForeColor=Color.FromArgb(222,181,100)};panel.Controls.Add(info,0,2);
-      var preparation=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));panel.Controls.Add(preparation,0,3);
+      chat=new ChatPanel(support??ChatFiles.Support);panel.Controls.Add(chat,0,2);
+      info=new Label{Dock=DockStyle.Fill,Padding=new Padding(0,12,0,0),ForeColor=Color.FromArgb(222,181,100)};panel.Controls.Add(info,0,3);
+      var preparation=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));panel.Controls.Add(preparation,0,4);
       equipment=new Button{Text="장비 설정",Dock=DockStyle.Fill};readyButton=new Button{Text="준비 완료",Dock=DockStyle.Fill};preparation.Controls.Add(equipment,0,0);preparation.Controls.Add(readyButton,1,0);
       equipment.Click+=async(s,e)=>await Perform(()=>changeEquipment(roomId));
       readyButton.Click+=async(s,e)=>await Perform(()=>requestReady(roomId,!selfReady));
-      var buttons=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,38));buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,62));panel.Controls.Add(buttons,0,4);
+      var buttons=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,38));buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,62));panel.Controls.Add(buttons,0,5);
       var cancel=new Button{Text="방 나가기",Dock=DockStyle.Fill};buttons.Controls.Add(cancel,0,0);
       begin=new Button{Text="대전 시작",Dock=DockStyle.Fill,Enabled=false,BackColor=Color.FromArgb(222,181,100),ForeColor=Color.FromArgb(25,28,26)};buttons.Controls.Add(begin,1,0);
       cancel.Click+=(s,e)=>Close();begin.Click+=(s,e)=>{
@@ -191,7 +201,10 @@ namespace KarmaLocal {
       lastData=data;
       roomId=Read(data,"roomId");bool host=Flag(data,"isHost"),manual=Flag(data,"manualStart");
       string mode=Read(data,"mode"),modeName=mode=="tdm"?"팀 전멸전":mode=="dm"?"개인 데스매치":"1:1 대전";
-      string roomName=Read(data,"roomName");title.Text=(roomName==""?"카르마 대기실":roomName)+"    ·    "+Read(data,"players")+" / "+Read(data,"maxPlayers")+"명\n코드 "+Read(data,"code")+" · "+modeName+(host?" · 방장":"");
+      chat.SetMode(mode);
+      string roomName=Read(data,"roomName");int seconds;Int32.TryParse(Read(data,"timeLimitSeconds"),out seconds);
+      string limits=(mode=="tdm"?Read(data,"roundWinLimit")+"승":Read(data,"killLimit")+"킬")+" / "+(seconds/60)+"분";
+      title.Text=(roomName==""?"카르마 대기실":roomName)+"    ·    "+Read(data,"players")+" / "+Read(data,"maxPlayers")+"명\n코드 "+Read(data,"code")+" · "+modeName+(host?" · 방장":"")+"\n종료 조건: "+limits+" 중 먼저 도달";
       var lines=new List<string>();object roster;selfReady=false;
       if(data.TryGetValue("members",out roster)&&roster is IEnumerable)foreach(object item in (IEnumerable)roster){
         var member=item as Dictionary<string,object>;if(member==null)continue;
@@ -587,7 +600,7 @@ namespace KarmaLocal {
         if(d!=null){
           object value;if(d.TryGetValue("message",out value))message=Convert.ToString(value);
           if(!lobbyLeaving&&!sessionObservedGame&&d.TryGetValue("phase",out value)&&Convert.ToString(value)=="waiting"){
-            if(lobby==null||lobby.IsDisposed){lobby=new LobbyWindow(RequestLanStart,SetLobbyReady,ConfigureLobbyEquipment,()=>{lobby=null;CancelLan();});lobby.UpdateLobby(d);lobby.Show(this);}
+            if(lobby==null||lobby.IsDisposed){lobby=new LobbyWindow(RequestLanStart,SetLobbyReady,ConfigureLobbyEquipment,()=>{lobby=null;CancelLan();},support);lobby.UpdateLobby(d);lobby.Show(this);}
             else lobby.UpdateLobby(d);
           }else CloseLobby();
         }
@@ -859,11 +872,12 @@ namespace KarmaLocal {
       port=JsonNumber(selected,"port",29020);if(port<1||port>65534)port=29020;
     }
     async Task LaunchLan(){
-      bool hosting=!JoinMode,lateJoin=false;string host,code,matchMode,roomId="",roomName="";int port,maxPlayers,mapIndex;
+      bool hosting=!JoinMode,lateJoin=false;string host,code,matchMode,roomId="",roomName="";int port,maxPlayers,mapIndex,killLimit=10,roundWinLimit=5,timeLimitSeconds=600;
       if(hosting){
         using(var dialog=new LanSetup(true,support)){
           if(dialog.ShowDialog(this)!=DialogResult.OK)return;
           host=dialog.Host;port=dialog.Port;code=dialog.Code;maxPlayers=dialog.MaxPlayers;matchMode=dialog.MatchMode;roomName=dialog.RoomName;
+          killLimit=dialog.KillLimit;roundWinLimit=dialog.RoundWinLimit;timeLimitSeconds=dialog.TimeLimitSeconds;
         }
         mapIndex=MapIndex(map);
       }else{
@@ -896,7 +910,7 @@ namespace KarmaLocal {
             {"model",Path.GetFileName(character.Read("model").Replace('/',Path.DirectorySeparatorChar)).ToLowerInvariant()}}}}}};
       lobbyConfig=(Dictionary<string,object>)options["config"];
       if(loadout!=null){lobbyConfig["inventory"]=loadout["inventory"];lobbyConfig["selectedWeapon"]=loadout["selectedWeapon"];}
-      if(hosting)options["roomName"]=roomName;
+      if(hosting){options["roomName"]=roomName;options["killLimit"]=killLimit;options["roundWinLimit"]=roundWinLimit;options["timeLimitSeconds"]=timeLimitSeconds;}
       if(!hosting)options["roomId"]=roomId;
       File.WriteAllText(configPath,json.Serialize(options),Encoding.UTF8);
       try{File.Delete(Path.Combine(support,"lan-cancel.json"));File.Delete(Path.Combine(support,"lan-status.json"));}catch{}
@@ -959,6 +973,8 @@ namespace KarmaLocal {
       try{
         string[] args=Environment.GetCommandLineArgs();
         if(args.Length==4&&args[1]=="--coin-hud")Application.Run(new CoinHud(Int32.Parse(args[2]),Int32.Parse(args[3])));
+        else if(args.Length==5&&args[1]=="--results")Application.Run(new ResultsWindow(args[2],args[3],Int32.Parse(args[4])));
+        else if(args.Length==6&&args[1]=="--chat")Application.Run(new ChatWindow(args[2],args[3],Int32.Parse(args[4]),args[5]));
         else if(args.Length>=5&&args.Length<=7&&args[1]=="--pause")Application.Run(new PauseWindow(args[2],args[3],Int32.Parse(args[4]),args.Contains("--lan"),args.Contains("--confirm-exit")));
         else {
           string installRoot=AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);

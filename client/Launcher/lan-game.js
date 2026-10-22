@@ -407,7 +407,7 @@ function validate(x){
  if(x.type==='leave')return true;
  if(x.type==='peer-left')return typeof x.playerId==='string';
  if(x.type==='peer-joined')return validPeer(x.peer);
- if(x.type==='match-snapshot')return Array.isArray(x.players)&&x.players.length<=8&&x.players.every(p=>idValid(p.playerId)&&integer(p.kills,0,1e6)&&integer(p.deaths,0,65535))&&integer(x.remainingSeconds,0,86400);
+ if(x.type==='match-snapshot')return Array.isArray(x.players)&&x.players.length<=8&&x.players.every(p=>idValid(p.playerId)&&integer(p.kills,0,1e6)&&integer(p.deaths,0,65535)&&(p.points===undefined||integer(p.points,0,1e9)))&&integer(x.remainingSeconds,0,86400);
  if(x.type==='round-start')return integer(x.round,1,1000)&&x.lives&&integer(x.lives[selfId],1,1e9);
  if(x.type==='round-ended')return integer(x.round,1,1000);
  if(x.type==='death-confirmed')return x.receipt&&typeof x.receipt.victimId==='string'&&integer(x.receipt.victimLife,1,1e9);
@@ -420,7 +420,11 @@ function validate(x){
   (x.armorPierce===undefined||integer(x.armorPierce,0,1));
  return false;
 }
-function scores(){return st.gm?Array.from({length:Math.max(0,...peers.map(p=>p.index))+1},(_,slot)=>({slot,playerId:playerId(slot),active:slot===0||!peerByIndex(slot)?.left,kills:st.gm.add(0x1458+slot*16).readS32(),deaths:st.gm.add(0x1460+slot*16).readU16()})):null;}
+// Both original Shift row renderers read Point from this encoded profile field,
+// not the unused word between K/D. The server supplies this match's combat XP;
+// do not run the original XP routine (425be0), which needs the defunct online client.
+function setPoints(g,slot,points){g.add(0xfc8+slot*0x98).writeS32(points+12345);}
+function scores(){return st.gm?Array.from({length:Math.max(0,...peers.map(p=>p.index))+1},(_,slot)=>({slot,playerId:playerId(slot),active:slot===0||!peerByIndex(slot)?.left,kills:st.gm.add(0x1458+slot*16).readS32(),deaths:st.gm.add(0x1460+slot*16).readU16(),points:st.gm.add(0xfc8+slot*0x98).readS32()-12345})):null;}
 function countDeath(victim,life,killer,weapon){
  const key=playerId(victim)+':'+life;
  if(!boundedRemember(st.deathIds,key)||!st.gm)return;
@@ -552,6 +556,7 @@ function seedPeer(g,m,peer){
  else {g.add(0x166+i*0x100).writeByteArray(new Uint8Array(0x100));g.add(0x166+i*0x100).writeUtf8String(name.replace(/[^ -~]/g,'').slice(0,63)||'Player '+i);}
  g.add(0x990+i*4).writeS32(0);
  g.add(0xad0+i*0x98).writeByteArray(new Uint8Array(0x98));g.add(0xf90+i*0x98).writeByteArray(new Uint8Array(0x98));
+ setPoints(g,i,0);
  g.add(0xab0+i*4).writeS32(0);g.add(0x9b0+i*32).writeByteArray(new Uint8Array(32));g.add(0x1450+i).writeU8(0);
  globalThis.KARMA_SET_PEER_RANK?.(i,c.rank);
 }
@@ -622,7 +627,8 @@ function joinPeer(value){
 }
 function applySnapshot(x){
  for(const p of x.players){const index=nativeIndex(p.playerId);if(index<0)continue;
-  st.gm.add(0x1458+index*16).writeS32(p.kills);st.gm.add(0x1460+index*16).writeU16(p.deaths);}
+  st.gm.add(0x1458+index*16).writeS32(p.kills);st.gm.add(0x1460+index*16).writeU16(p.deaths);
+  if(p.points!==undefined)setPoints(st.gm,index,p.points);}
  nativeSort(st.gm);send({event:'lan-match-snapshot',scores:scores(),remainingSeconds:x.remainingSeconds});
 }
 function processMessage(x){
@@ -652,6 +658,7 @@ Interceptor.attach(P(0x420560),{
  onLeave(result){
   if(result.toInt32()===0||P(0x548d70).readS32()!==1)return;
   const g=this.gm,m=g.add(0xc).readPointer();st.gm=g;
+  for(let i=0;i<8;i++)setPoints(g,i,0);
   // Every machine keeps itself at native slot0; wire IDs are mapped to 1..7.
   // These arrays each have eight native entries. Seed the complete online profile
   // records before the original loader instantiates actors and target badges.
