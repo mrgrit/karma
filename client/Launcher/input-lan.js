@@ -1,7 +1,7 @@
 'use strict';
 // LAN input menu, based on the verified single-player v8 helper.
 // F10 releases local input while native frames, combat and network continue.
-// Escape exits. Menu commands and device changes run on the game thread.
+// Escape opens an external exit confirmation. Menu commands and device changes run on the game thread.
 const user32 = Process.getModuleByName('user32.dll');
 const api = (name, ret, args) => new NativeFunction(user32.getExportByName(name), ret, args, 'stdcall');
 // Must run while the game is suspended, before its first HWND is created.
@@ -82,6 +82,26 @@ const postMessage = api('PostMessageW', 'int', ['pointer', 'uint', 'pointer', 'p
 const MENU_MESSAGE = 0x84a1;
 let exitRequested = false, paused = false, resumePending = false;
 let escapeDown = false, f10Down = false;
+// A high bit at startup/focus return is a held state, not a new key press.
+// Each polling source must independently observe release before it can act.
+const pollArmed = { 'async-key': [false, false], directinput: [false, false] };
+const heldReported = new Set();
+function resetHotkeyPolling() {
+  for (const state of Object.values(pollArmed)) state.fill(false);
+  heldReported.clear();
+}
+function polledPressAllowed(source, index, held) {
+  const state = pollArmed[source];
+  if (!state) return true; // A fresh targeted WM_KEYDOWN is an explicit edge.
+  if (!held) { state[index] = true; return true; }
+  if (state[index]) return true;
+  const key = source + ':' + index;
+  if (!heldReported.has(key)) {
+    heldReported.add(key);
+    send({ kind: 'hotkey-held-on-focus', source, key: index === 0 ? 'Escape' : 'F10' });
+  }
+  return false;
+}
 let lastForeground = false, cursorIncrements = 0, cursorReleased = false;
 const commands = [];
 globalThis.KARMA_LOCAL_PAUSED = false;
@@ -215,7 +235,7 @@ function inputUnavailable() {
   const hwnd = ptr('0x548d50').readPointer();
   return hwnd.isNull() || !foreground().equals(hwnd);
 }
-function requestPause(source) {
+function requestPause(source, confirmExit = false) {
   if (exitRequested || paused) return false;
   // Keep the native game clock running during the LAN input menu.
   paused = true;
@@ -227,7 +247,7 @@ function requestPause(source) {
   catch (error) { send({ kind: 'pause-release-warning', message: String(error) }); }
   try { clearInputBuffers(getInput()); }
   catch (error) { send({ kind: 'pause-clear-warning', message: String(error) }); }
-  send({ kind: 'pause-requested', source, inputOnly: true, worldContinues: true,
+  send({ kind: 'pause-requested', source, confirmExit, inputOnly: true, worldContinues: true,
     hwnd: ptr('0x548d50').readPointer().toString(), pid: Process.id });
   return true;
 }
@@ -245,6 +265,7 @@ function resumePause(source) {
   updateGate();
   pauseChanged(false);
   // Do not interpret the key that closed the external menu as a new press.
+  resetHotkeyPolling();
   escapeDown = escapeDown || (getKey(0x1b) & 0x8000) !== 0;
   f10Down = f10Down || (getKey(0x79) & 0x8000) !== 0;
   clearInputBuffers(getInput());
@@ -265,7 +286,7 @@ function latchExit(source) {
   catch (error) { send({ kind: 'exit-release-warning', message: String(error) }); }
   try { clearInputBuffers(getInput()); }
   catch (error) { send({ kind: 'exit-clear-warning', message: String(error) }); }
-  send({ kind: 'exit-requested', source, confirmation: false });
+  send({ kind: 'exit-requested', source, confirmation: source === 'external-menu' });
   return true;
 }
 function requestExit(source) {
@@ -302,10 +323,13 @@ function drainCommands() {
 }
 function hotkeys(source, escape, f10) {
   if (exitRequested) return;
-  const newEscape = escape && !escapeDown, newF10 = f10 && !f10Down;
-  escapeDown = escape;
-  f10Down = f10;
-  if (newEscape) requestExit(source);
+  const allowEscape = escape === undefined ? false : polledPressAllowed(source, 0, escape);
+  const allowF10 = f10 === undefined ? false : polledPressAllowed(source, 1, f10);
+  const newEscape = escape && !escapeDown && allowEscape;
+  const newF10 = f10 && !f10Down && allowF10;
+  if (escape !== undefined) escapeDown = escape;
+  if (f10 !== undefined) f10Down = f10;
+  if (newEscape && !paused) requestPause(source, true);
   // The external menu owns resume. A delayed WM_KEYDOWN can follow an
   // async press and release (notably over RDP); it must not reopen input
   // while the menu is still visible.
@@ -320,6 +344,7 @@ function serviceFrame() {
   if (!active) {
     if (!cursorReleased) releaseInput();
     lastForeground = false;
+    resetHotkeyPolling();
     if (!paused) { escapeDown = false; f10Down = false; }
     return;
   }
@@ -359,8 +384,8 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
             if (param === 0x1b) escapeDown = true;
             else f10Down = true;
           } else {
-            hotkeys('window-key', param === 0x1b || (getKey(0x1b) & 0x8000) !== 0,
-              param === 0x79 || (getKey(0x79) & 0x8000) !== 0);
+            hotkeys('window-key', param === 0x1b ? true : undefined,
+              param === 0x79 ? true : undefined);
           }
         }
       }
@@ -370,6 +395,7 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
       (this.message === 0x1c && param === 0);
     if (inactive) {
       lastForeground = false;
+      resetHotkeyPolling();
       if (!paused && !exitRequested) { escapeDown = false; f10Down = false; }
       try { releaseInput(); }
       catch (error) { send({ kind: 'focus-release-warning', message: String(error) }); }
@@ -481,7 +507,7 @@ Memory.protect(gate, Process.pageSize, 'r-x');
 retained.listeners.push(Interceptor.attach(gate, { onEnter() { serviceFrame(); } }));
 Memory.patchCode(dispatcherCall, 5, code => code.writeByteArray(
   [0xe8, ...little32(gateAddress - (dispatcherCall.toUInt32() + 5))]));
-send({ kind: 'input-menu-ready', keys: { Escape: 'quit', F10: 'input-menu' },
+send({ kind: 'input-menu-ready', keys: { Escape: 'confirm-exit', F10: 'input-menu' },
   sources: ['window-key', 'directinput', 'async-key', 'external-menu'], behavior: 'external-input-menu', mode: 'lan', pausesWorld: false,
-  confirmation: false, nativeFrameGate: gate.toString(),
-  nativeClockGate: retained.clockPage.toString(), clockArithmetic: 'native-uint32', version: 9 });
+  confirmation: true, nativeFrameGate: gate.toString(),
+  nativeClockGate: retained.clockPage.toString(), clockArithmetic: 'native-uint32', version: 10 });

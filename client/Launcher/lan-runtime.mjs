@@ -73,7 +73,7 @@ const openMenu=message=>{
   if(pauseChild||!/^0x[0-9a-f]+$/i.test(message.hwnd||''))return;
   const commandFile=path.join(support,'pause-lan-'+pid+'-'+Date.now()+'.json');
   const child=spawnHelper(path.join(root,'KarmaLauncher.exe'),
-    ['--pause',commandFile,message.hwnd,String(pid),'--lan'],
+    ['--pause',commandFile,message.hwnd,String(pid),'--lan',...(message.confirmExit?['--confirm-exit']:[])],
     {cwd:root,stdio:'ignore',windowsHide:false});
   pauseChild=child;
   let childExited=false;
@@ -203,9 +203,9 @@ try{
     }
     log('agent',payload);
     if(payload.event==='offline-player-death')status('playing',peer.match?.mode==='tdm'?'전사 · 팀전은 다음 라운드에 다시 등장합니다.':peer.match?.mode==='dm'?'전사 · 10초 후 랜덤 위치에서 다시 등장합니다.':'전사 · 잠시 후 다시 등장합니다.');
-    if(payload.event==='lan-local-respawn')status('playing','재등장 · Tab 점수판 · F10 메뉴 · Esc 종료');
+    if(payload.event==='lan-local-respawn')status('playing','재등장 · Tab 점수판 · F10 메뉴 · Esc 종료 확인');
     if(payload.kind==='exit-requested')stop('LAN 대전을 종료했습니다.');
-    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);if(!closeCoinHud)closeCoinHud=startCoinHud({root,pid,host:options.host,port:options.port,log});status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료');}
+    if(payload.event==='game-frame-ready'){clearTimeout(startupTimer);if(!closeCoinHud)closeCoinHud=startCoinHud({root,pid,host:options.host,port:options.port,log});status('playing',(peer.match?.mode==='tdm'?'팀 '+(peer.team===0?'RED':'BLUE')+' · 팀전 · 라운드 중 부활 없음':peer.match?.mode==='dm'?'개인 데스매치':'1:1 대전')+' · Tab 점수 · F10 메뉴 · Esc 종료 확인');}
     if(payload.kind==='pause-requested')openMenu(payload);
   });
   const done=new Promise(resolve=>session.detached.connect((reason,crash)=>{

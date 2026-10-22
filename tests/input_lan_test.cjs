@@ -93,7 +93,7 @@ const harness=scope.makeHarness;
 // RDP delivered the window message 15ms after the polled press. A frame
 // observing release in between used to resume behind a still-open menu.
 {
-  const h=harness();h.s.held.add(0x79);h.frame();
+  const h=harness();h.frame();h.keyboard();h.s.held.add(0x79);h.frame();
   h.s.held.clear();h.frame();h.windowMessage(0x104,0x79);
   assert.equal(h.inspect().paused,true,'delayed window edge keeps menu input released');
   assert.equal(h.s.cursor,0);assert.equal(h.events.filter(e=>e.kind==='pause-resumed').length,0);
@@ -102,7 +102,9 @@ const harness=scope.makeHarness;
 }
 for(const origin of ['escape','rpc','native']) {
   const h=harness();h.windowMessage(0x100,0x79);
-  if(origin==='escape')h.windowMessage(0x100,0x1b);
+  if(origin==='escape'){h.command('resume');h.windowMessage(0x84a1);h.windowMessage(0x100,0x1b);
+    assert.equal(h.s.quits,0);assert.equal(h.events.filter(e=>e.kind==='pause-requested').at(-1).confirmExit,true);
+    h.command('quit');h.windowMessage(0x84a1);}
   else if(origin==='rpc'){h.command('quit');h.windowMessage(0x84a1);}
   else h.nativeQuit();
   assert.equal(h.s.quits,1);

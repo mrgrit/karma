@@ -168,7 +168,7 @@ function harness(bad = '') {
   assert(h.retained.listeners.length>=3,'all native references retained');
 }
 {
-  const h=harness();h.s.held.add(0x79);h.frame();
+  const h=harness();h.frame();h.keyboard();h.s.held.add(0x79);h.frame();
   assert.equal(h.inspect().paused,true);assert.equal(h.s.quits,0);
   assert.equal(h.retained.flagPage.readU8(),1);assert.equal(h.context.KARMA_LOCAL_PAUSED,true);
   assert.equal(h.s.cursor,0);
@@ -191,7 +191,7 @@ function harness(bad = '') {
   h.frame();assert.equal(h.inspect().paused,false,'resume key remains debounced');
 }
 {
-  const h=harness();h.keyboard(0x44,true);
+  const h=harness();h.keyboard();h.keyboard(0x44,true);
   assert.equal(h.inspect().paused,true);assert.equal(h.s.quits,0);
   h.s.fg=0x4000;
   const before=h.calls.length;
@@ -209,7 +209,7 @@ function harness(bad = '') {
   assert.equal(h.events.filter(e=>e.kind==='pause-resume-pending').length,1);
 }
 {
-  const h=harness();h.s.held.add(0x79);h.frame();
+  const h=harness();h.frame();h.keyboard();h.s.held.add(0x79);h.frame();
   h.command('quit');assert.equal(h.s.quits,0);h.windowMessage(0x84a1);
   assert.equal(h.s.quits,1);assert.equal(h.inspect().exitRequested,true);
   const acquired=h.acquired();h.command('resume');h.frame();h.keyboard();h.mouse();
@@ -217,8 +217,10 @@ function harness(bad = '') {
   assert.equal(h.retained.flagPage.readU8(),1);
 }
 {
-  const h=harness();h.keyboard(1,true);
-  assert.equal(h.s.quits,1);assert.equal(h.inspect().paused,false);
+  const h=harness();h.keyboard();h.keyboard(1,true);
+  assert.equal(h.s.quits,0);assert.equal(h.inspect().paused,true);
+  assert.equal(h.events.find(e=>e.kind==='pause-requested').confirmExit,true);
+  h.command('quit');h.windowMessage(0x84a1);assert.equal(h.s.quits,1);
   assert.equal(h.inspect().exitRequested,true);
   h.requestExit('duplicate');h.frame();assert.equal(h.s.quits,1);
 }
@@ -237,7 +239,7 @@ function harness(bad = '') {
   assert.equal(h.s.cursor,0);
 }
 {
-  const h=harness();h.s.showError=true;h.keyboard(1,true);
+  const h=harness();h.s.showError=true;h.requestExit("test-cleanup");
   assert(h.events.some(e=>e.kind==='exit-release-warning'));assert.equal(h.s.quits,1);
 }
 {
@@ -290,12 +292,14 @@ for(const [down,up] of [[0x100,0x101],[0x104,0x105]]) {
   assert.equal(h.events.filter(e=>e.kind==='pause-resumed').length,1);
   h.s.held.clear();h.windowMessage(up,0x79,0xc0000000);h.frame();
   h.windowMessage(down,0x1b);
-  assert.equal(h.s.deliveredMessage,0);assert.equal(h.s.quits,1,'short Escape exits immediately');
+  assert.equal(h.s.deliveredMessage,0);assert.equal(h.s.quits,0,'short Escape waits for confirmation');
+  assert.equal(h.inspect().paused,true);assert.equal(h.events.filter(e=>e.kind==='pause-requested').at(-1).confirmExit,true);
+  h.command('quit');h.windowMessage(0x84a1);assert.equal(h.s.quits,1);
 }
 // RDP delivered the window message 15ms after the polled press. A frame
 // observing release in between used to resume behind a still-open menu.
 {
-  const h=harness();h.s.held.add(0x79);h.frame();
+  const h=harness();h.frame();h.keyboard();h.s.held.add(0x79);h.frame();
   h.s.held.clear();h.frame();h.windowMessage(0x104,0x79);
   assert.equal(h.inspect().paused,true,'delayed window edge keeps menu input released');
   assert.equal(h.s.cursor,0);assert.equal(h.events.filter(e=>e.kind==='pause-resumed').length,0);
@@ -303,7 +307,7 @@ for(const [down,up] of [[0x100,0x101],[0x104,0x105]]) {
   h.command('resume');h.windowMessage(0x84a1);assert.equal(h.inspect().paused,false);
 }
 for(const origin of ['async','directinput']) {
-  const h=harness();h.s.held.add(0x79);
+  const h=harness();h.frame();h.keyboard();h.s.held.add(0x79);
   if(origin==='async')h.frame();else h.keyboard(0x44,true);
   h.windowMessage(0x104,0x79);
   assert.equal(h.inspect().paused,true,'message following '+origin+' cannot double-toggle');

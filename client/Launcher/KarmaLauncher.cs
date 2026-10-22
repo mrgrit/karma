@@ -22,7 +22,7 @@ namespace KarmaLocal {
     readonly int gamePid;
     readonly System.Windows.Forms.Timer watcher;
     string choice="";
-    public PauseWindow(string path,string hwnd,int pid,bool lan) {
+    public PauseWindow(string path,string hwnd,int pid,bool lan,bool confirmExit=false) {
       string allowed=Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher"))+Path.DirectorySeparatorChar;
       commandPath=Path.GetFullPath(path);
       if(!commandPath.StartsWith(allowed,StringComparison.OrdinalIgnoreCase)||
@@ -33,21 +33,36 @@ namespace KarmaLocal {
       AutoScaleMode=AutoScaleMode.Dpi;StartPosition=FormStartPosition.CenterScreen;
       MaximizeBox=false;MinimizeBox=false;TopMost=true;KeyPreview=true;
       BackColor=Color.FromArgb(21,29,35);ForeColor=Color.White;Font=new Font("Malgun Gothic",11);
-      Controls.Add(new Label{Text=(lan?"LAN 메뉴 · 대전은 계속됩니다.":"일시 정지")+"\n내 코인   "+CoinHud.ReadBalance(),Location=new Point(24,22),Size=new Size(362,70)});
+      var heading=new Label{Text=(lan?"LAN 메뉴 · 대전은 계속됩니다.":"일시 정지")+"\n내 코인   "+CoinHud.ReadBalance(),Location=new Point(24,22),Size=new Size(362,70)};
+      Controls.Add(heading);
       Button resume=new Button{Text="계속  (F10)",Location=new Point(24,115),Size=new Size(170,48)};
-      Button exit=new Button{Text="게임 종료  (Esc)",Location=new Point(210,115),Size=new Size(176,48)};
+      Button exit=new Button{Text="게임 종료…",Location=new Point(210,115),Size=new Size(176,48)};
       var matchStatus=new Label{Location=new Point(24,91),Size=new Size(362,80),ForeColor=Color.FromArgb(223,184,105)};
       if(lan){Controls.Add(matchStatus);resume.Top=190;exit.Top=190;}
       Controls.Add(resume);Controls.Add(exit);AcceptButton=resume;
-      resume.Click+=(s,e)=>Submit("resume");exit.Click+=(s,e)=>Submit("quit");
-      KeyDown+=(s,e)=>{if(e.KeyCode==Keys.F10){e.Handled=true;Submit("resume");}else if(e.KeyCode==Keys.Escape){e.Handled=true;Submit("quit");}};
+      Action showConfirmation=()=>{
+        confirmExit=true;Text="카르마 · 종료 확인";
+        heading.Text=(lan?"대전을 종료하시겠습니까?":"사격 연습을 종료하시겠습니까?")+"\n내 코인   "+CoinHud.ReadBalance();
+        resume.Text="계속하기 (Esc)";exit.Text="종료";
+        matchStatus.Text="확인 중에도 LAN 대전은 계속됩니다.";
+        AcceptButton=resume;resume.Focus();
+      };
+      if(confirmExit)showConfirmation();
+      resume.Click+=(s,e)=>Submit("resume");
+      exit.Click+=(s,e)=>{if(confirmExit)Submit("quit");else showConfirmation();};
+      KeyDown+=(s,e)=>{
+        if(e.KeyCode==Keys.F10||e.KeyCode==Keys.Escape){
+          e.Handled=true;e.SuppressKeyPress=true;
+          if(e.KeyCode==Keys.F10||confirmExit)Submit("resume");else showConfirmation();
+        }
+      };
       Shown+=(s,e)=>{Activate();resume.Focus();};
       FormClosing+=(s,e)=>{if(choice=="")WriteChoice("resume");};
       FormClosed+=(s,e)=>{watcher.Stop();watcher.Dispose();if(choice=="resume")SetForegroundWindow(gameWindow);};
       watcher=new System.Windows.Forms.Timer{Interval=700};
       watcher.Tick+=(s,e)=>{
         try{using(Process p=Process.GetProcessById(gamePid)){if(p.HasExited)Close();}}catch{Close();}
-        if(lan)try{var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(allowed,"lan-status.json")));matchStatus.Text=Convert.ToString(value["message"]);}catch{}
+        if(lan&&!confirmExit)try{var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(allowed,"lan-status.json")));matchStatus.Text=Convert.ToString(value["message"]);}catch{}
       };
       watcher.Start();
     }
@@ -500,7 +515,7 @@ namespace KarmaLocal {
         summary.Text=(room==null?"참가할 방을 선택하세요":room.MapName+" · "+room.HostName+"의 방")+"  /  "+(character!=null?character.Name:"캐릭터 미선택");
         UpdateRunning();return;
       }
-      selection.Text=map!=null?"선택한 전장\n"+map.Name+"\n\nW/A/S/D 이동\n마우스 시점 · 왼쪽 클릭 발사\n"+(LanMode?"G 버리기 · E 줍기\nF10 메뉴 · Esc 종료":"F10 일시 정지 · Esc 종료"):"전장을 선택하세요.";
+      selection.Text=map!=null?"선택한 전장\n"+map.Name+"\n\nW/A/S/D 이동\n마우스 시점 · 왼쪽 클릭 발사\n"+(LanMode?"G 버리기 · E 줍기\nF10 메뉴 · Esc 종료 확인":"F10 일시 정지 · Esc 종료 확인"):"전장을 선택하세요.";
       summary.Text=(map!=null?map.Name:"전장 미선택")+"  /  "+(character!=null?character.Name:"캐릭터 미선택");
       if(tab==2&&weapon!=null)weaponInfo.Text=weapon.Name+"  ·  "+weapon.Read("category")+"  |  원본 게임 내 무기";
       UpdateRunning();
@@ -582,7 +597,7 @@ namespace KarmaLocal {
       bool ai=modes.SelectedIndex==3;
       start.Enabled=!running&&!sessionActive&&(JoinMode?roomDirectory.SelectionReady:map!=null)&&character!=null&&(!ai||AiReady);
       start.Text=running?"게임 실행 중":sessionActive?"게임 시작 중":ai&&!AiReady?"AI 기능 준비 중":LanMode?(modes.SelectedIndex==4?"서버 방 만들기 →":"선택한 방 참가 →"):"게임 시작  →";
-      status.Text=running?"F10 메뉴 · Esc 종료 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · "+(modes.SelectedIndex==5?"개설된 방을 선택해 참가":map!=null?map.Name:""):ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료";
+      status.Text=running?"F10 메뉴 · Esc 종료 확인 · 종료하면 선택 화면으로 돌아옵니다.":sessionActive?"게임을 시작하고 있습니다…":sessionError!=""?"실행 오류: "+sessionError:LanMode?"1:1 / 4:4 팀전 / 8인 개인전 · "+(modes.SelectedIndex==5?"개설된 방을 선택해 참가":map!=null?map.Name:""):ai&&!AiReady?"AI 대전은 아직 사용할 수 없습니다.":ai?"AI 1명 · 사망 후 재등장 · Mass of Winter 시험판":"F10 일시 정지 · Esc 종료 확인";
     }
     void CloseLobby(){if(lobby!=null){var old=lobby;lobby=null;old.Dismiss();}}
     void RequestLanStart(string roomId){
@@ -944,7 +959,7 @@ namespace KarmaLocal {
       try{
         string[] args=Environment.GetCommandLineArgs();
         if(args.Length==4&&args[1]=="--coin-hud")Application.Run(new CoinHud(Int32.Parse(args[2]),Int32.Parse(args[3])));
-        else if((args.Length==5||args.Length==6)&&args[1]=="--pause")Application.Run(new PauseWindow(args[2],args[3],Int32.Parse(args[4]),args.Contains("--lan")));
+        else if(args.Length>=5&&args.Length<=7&&args[1]=="--pause")Application.Run(new PauseWindow(args[2],args[3],Int32.Parse(args[4]),args.Contains("--lan"),args.Contains("--confirm-exit")));
         else {
           string installRoot=AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
           using(var lease=ReleaseUpdate.Acquire(installRoot)){

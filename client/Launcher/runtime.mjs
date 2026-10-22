@@ -70,7 +70,7 @@ try {
     pauseCommand=path.join(support,'pause-'+pid+'-'+Date.now()+'.json');
     const commandFile=pauseCommand;
     const helper=spawnHelper(path.join(support,'../KarmaLauncher.exe'),
-      ['--pause',commandFile,message.hwnd,String(pid)],{cwd:path.resolve(support,'..'),windowsHide:false,stdio:'ignore'});
+      ['--pause',commandFile,message.hwnd,String(pid),...(message.confirmExit?['--confirm-exit']:[])],{cwd:path.resolve(support,'..'),windowsHide:false,stdio:'ignore'});
     pauseHelper=helper;
     let exited=false,exitTime=0;
     helper.on('exit',()=>{exited=true;exitTime=Date.now();});
