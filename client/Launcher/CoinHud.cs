@@ -23,6 +23,7 @@ namespace KarmaLocal {
     public static void InitializeDpi(){try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch(EntryPointNotFoundException){SetProcessDPIAware();}}
     readonly int gamePid,parentPid;
     readonly ChatHud chat;
+    readonly KillFeedHud feed;
     readonly Timer timer=new Timer {Interval=300};
     string balance="코인 조회 대기",lootHint="";
     float displayScale=1f;
@@ -34,7 +35,8 @@ namespace KarmaLocal {
       BackColor=Color.FromArgb(20,27,35);ForeColor=Color.FromArgb(244,206,124);Opacity=.9;DoubleBuffered=true;
       ClientSize=new Size(230,44);StartPosition=FormStartPosition.Manual;Location=new Point(-10000,-10000);
       chat=new ChatHud(gamePid);
-      timer.Tick+=(s,e)=>UpdateHud();Shown+=(s,e)=>{UpdateHud();chat.Show();};FormClosed+=(s,e)=>{timer.Dispose();chat.Close();};timer.Start();
+      feed=new KillFeedHud(gamePid);
+      timer.Tick+=(s,e)=>UpdateHud();Shown+=(s,e)=>{UpdateHud();chat.Show();feed.Show();};FormClosed+=(s,e)=>{timer.Dispose();chat.Close();feed.Close();};timer.Start();
     }
     public static string ReadBalance() {
       try {

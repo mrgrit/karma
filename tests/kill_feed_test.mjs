@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {addKillFeed} from '../client/Launcher/kill-feed.mjs';
+const events=[],feed={id:'one',kind:'kill',killerId:'a',victimId:'b',killerName:'학생 A',victimName:'학생 B',weaponName:'Kar.98k 저격소총',headshot:true,time:999999999};
+assert(addKillFeed(events,feed,100));assert.equal(events[0].receivedAt,100);assert.equal(events[0].headshot,true);
+assert(!addKillFeed(events,feed,101));assert.equal(events.length,1);
+assert(!addKillFeed(events,{...feed,id:'bad',kind:'invented'},102));
+assert(addKillFeed(events,{...feed,id:'self',kind:'self',victimName:'이름\n변조'},103));assert.equal(events[1].headshot,false);assert.equal(events[1].victimName,'이름 변조');
+for(let i=0;i<100;i++)addKillFeed(events,{...feed,id:'new'+i},200+i);
+assert.equal(events.length,80);assert.equal(events.at(-1).id,'new99');
+console.log('PASS kill feed local state: confirmed shape, deduplication, bounded history, local expiry clock, safe single-line names, no self-headshot.');

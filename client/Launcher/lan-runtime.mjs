@@ -6,6 +6,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createLanPeer} from './lan-transport.mjs';
 import {createCentralPeer} from './central-transport.mjs';
 import {startCoinHud} from './coin-hud.mjs';
+import {addKillFeed} from './kill-feed.mjs';
 const support=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(support,'..'),game=path.join(root,'App_Executables');
 const readJson=file=>JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
@@ -21,6 +22,8 @@ const logPath=path.join(support,'last-session.log');
 const lootHintPath=path.join(support,'loot-hint.json');
 const chatStatePath=path.join(support,'pause-chat-state.json');
 const chatMessages=[];let chatError='',chatErrorAt=0;
+const feedPath=path.join(support,'pause-kill-feed.json'),feedEvents=[];
+const saveFeed=()=>fs.writeFileSync(feedPath,JSON.stringify({gamePid:pid||0,localPlayerId:peer?.playerId||'',events:feedEvents}));
 const saveChat=()=>fs.writeFileSync(chatStatePath,JSON.stringify({gamePid:pid||0,mode:peer?.match?.mode||options.matchMode||'duel',messages:chatMessages,error:chatError,errorAt:chatErrorAt}));
 for(const file of fs.readdirSync(support))if(/^pause-chat-send-[a-z0-9-]+\.json$/i.test(file))try{fs.unlinkSync(path.join(support,file));}catch{}
 try{fs.unlinkSync(lootHintPath);}catch{}
@@ -34,6 +37,7 @@ let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,conn
   failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud,accountProfile={},matchResult=null,resultFiles=[];
 const checkClosing=()=>{if(closing)throw Error('LAN 대전이 취소되었습니다.');};
 saveChat();
+saveFeed();
 const cleanMenu=()=>{
   clearInterval(pauseTimer);pauseTimer=null;
   if(pauseChild){try{pauseChild.kill();}catch{}pauseChild=null;}
@@ -154,6 +158,7 @@ try{
     killLimit:options.killLimit,roundWinLimit:options.roundWinLimit,timeLimitSeconds:options.timeLimitSeconds,
     onStatus:detail=>{
       const phase=detail.phase||detail.type||detail.status;
+      if(phase==='death-confirmed'&&addKillFeed(feedEvents,detail.feed))saveFeed();
       if(phase==='chat'){
         if(!chatMessages.some(m=>m.id===detail.id)){const {type,phase,...item}=detail;chatMessages.push(item);if(chatMessages.length>80)chatMessages.shift();saveChat();}
         return;
@@ -218,7 +223,7 @@ try{
   const bundled=path.join(root,'Runtime/node_modules/frida/build/src/frida.js');
   const frida=await import(pathToFileURL(fs.existsSync(bundled)?bundled:path.resolve(root,runtime.fridaModule)).href);
   checkClosing();device=await frida.getLocalDevice();checkClosing();
-  pid=await device.spawn([exe],{cwd:game});saveChat();checkClosing();
+  pid=await device.spawn([exe],{cwd:game});saveChat();saveFeed();checkClosing();
   startupTimer=setTimeout(()=>stop('게임 초기화가 30초 안에 완료되지 않았습니다.',true),30000);
   if(runtime.validationSeconds>0&&runtime.validationSeconds<=120)
     validationTimer=setTimeout(()=>stop('테스트 제한 시간이 끝났습니다.'),runtime.validationSeconds*1000);
@@ -278,4 +283,5 @@ try{
   try{fs.unlinkSync(lootHintPath);}catch{}
   try{fs.unlinkSync(settingsPath);}catch{}
   try{fs.unlinkSync(chatStatePath);}catch{}
+  try{fs.unlinkSync(feedPath);}catch{}
 }

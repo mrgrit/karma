@@ -32,8 +32,9 @@ namespace KarmaLocal {
     public event Action Sent;
     public ChatPanel(string directory){
       support=directory;Dock=DockStyle.Fill;Font=new Font("Malgun Gothic",10);MinimumSize=new Size(240,150);
-      var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=3,Margin=Padding.Empty};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-      layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,36));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,24));Controls.Add(layout);
+      var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=4,Margin=Padding.Empty};layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
+      layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,36));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,24));layout.RowStyles.Add(new RowStyle(SizeType.Absolute,24));Controls.Add(layout);
+      layout.Controls.Add(new Label{Text="비속어 자동 마스킹 · 전체/팀 채팅 원문은 관리자에게 보관됩니다.",Dock=DockStyle.Fill,AutoEllipsis=true,Font=new Font("Malgun Gothic",9),ForeColor=Color.Silver},0,3);
       history=new RichTextBox{Name="ChatHistory",Dock=DockStyle.Fill,ReadOnly=true,DetectUrls=false,BackColor=Color.FromArgb(25,35,43),ForeColor=Color.White,BorderStyle=BorderStyle.FixedSingle};layout.Controls.Add(history,0,0);
       var row=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,Margin=Padding.Empty};row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,76));layout.Controls.Add(row,0,1);
       channel=new ComboBox{Name="ChatChannel",DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Fill};channel.Items.Add("전체");channel.SelectedIndex=0;
