@@ -267,6 +267,8 @@ namespace KarmaLocal {
     Label myName,myRank,myXp,myResults,myMatches,myKd,myRatio,myWinrate,mySync;
     PictureBox portrait;
     Button start, loadoutButton, accountButton, refreshStats;
+    Button musicButton;
+    readonly MenuMusic menuMusic;
     Button[] tabs;
     TableLayoutPanel contentLayout;
     System.Windows.Forms.Timer watcher;
@@ -286,6 +288,7 @@ namespace KarmaLocal {
     public Launcher() {
       root=AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
       game=Path.Combine(root,"App_Executables"); support=Path.Combine(root,"Launcher");
+      menuMusic=new MenuMusic(Path.Combine(game,"Data","Sound","Music","menu.wma"),new MciMenuMusicPlayer());
       catalog=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(support,"catalog.json"),Encoding.UTF8));
       runtime=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(support,"runtime.json"),Encoding.UTF8));
       loadoutData=ReadSupportJson("loadouts.json");
@@ -305,7 +308,7 @@ namespace KarmaLocal {
       watcher=new System.Windows.Forms.Timer{Interval=1200};
       watcher.Tick+=(s,e)=>UpdateRunning(); watcher.Start();
       Shown+=async(s,e)=>{FitWorkingArea();await SyncMyStats();if(JoinMode)await roomDirectory.RefreshRooms();};
-      FormClosing+=(s,e)=>{closingLauncher=true;};
+      FormClosing+=(s,e)=>{closingLauncher=true;menuMusic.Dispose();};
       FormClosed+=(s,e)=>{watcher.Stop();if(sessionActive&&sessionLan)CancelLan();SavePreferences();if(sessionHelper!=null)sessionHelper.Dispose();foreach(Image i in images.Values)i.Dispose();};
     }
     List<CatalogItem> Items(string name) {
@@ -343,6 +346,9 @@ namespace KarmaLocal {
       accountButton.Left=header.ClientSize.Width-accountButton.Width-24;
       walletButton.Left=accountButton.Left;
       refreshStats.Left=accountButton.Left-refreshStats.Width-12;
+      musicButton=ButtonAt(header,"접속 음악 · 1회",refreshStats.Left,63,140,22);musicButton.Font=new Font("Malgun Gothic",8);musicButton.Enabled=false;
+      musicButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;header.Resize+=(s,e)=>musicButton.Left=refreshStats.Left;
+      musicButton.Click+=(s,e)=>{menuMusic.Stop();UpdateMusic(false);};
       accountButton.Click+=async(s,e)=>await ManageAccount();
       refreshStats.Click+=async(s,e)=>await SyncMyStats();
       UpdateAccountCaption();
@@ -578,8 +584,14 @@ namespace KarmaLocal {
       if(!closingLauncher)BeginInvoke(new Action(async()=>{await SyncMyStats();if(JoinMode)await roomDirectory.RefreshRooms();}));
       if(sessionError!="")MessageBox.Show(this,sessionError,"게임 실행 오류",MessageBoxButtons.OK,MessageBoxIcon.Information);
     }
+    void UpdateMusic(bool running){
+      menuMusic.Poll(running);if(musicButton==null)return;
+      musicButton.Enabled=menuMusic.Playing;
+      musicButton.Text=menuMusic.Playing?"음악 끄기":menuMusic.Failed?"음악 재생 불가":menuMusic.Attempted?"접속 음악 종료":"접속 음악 · 1회";
+    }
     void UpdateRunning() {
       if(start==null)return;
+      UpdateMusic(GameRunning());
       if(roomDirectory!=null)roomDirectory.Enabled=!configuringLan&&!sessionActive&&!GameRunning();
       if(refreshStats!=null)refreshStats.Enabled=!refreshingStats&&!configuringLan&&!sessionActive&&!GameRunning();
       if(refreshingStats){start.Enabled=false;start.Text="전적 확인 중";accountButton.Enabled=false;loadoutButton.Enabled=false;return;}
@@ -820,6 +832,7 @@ namespace KarmaLocal {
         throw new InvalidDataException("서버의 최신 계급 기록을 받지 못했습니다. 다시 연결해 주세요.");
       profileLoginRequired=false;profileSyncMessage=DateTime.Now.ToString("HH:mm")+" 서버 기록 갱신";
       RefreshCentralProfile();UpdateRankInfo();
+      menuMusic.Connected(GameRunning());UpdateMusic(false);
     }
     async Task<bool> EnsureCentralAccount(string host,int port) {
       bool loginRequired=false;
@@ -850,7 +863,7 @@ namespace KarmaLocal {
           if(!loginRequired)account.ShowAccount(cachedProfile);
           if(account.ShowDialog(this)==DialogResult.OK){
             if(account.Authenticated)await RefreshServerProfile(host,port);
-            else {profileLoginRequired=true;profileSyncMessage="로그인하면 전적이 표시됩니다.";RefreshCentralProfile();UpdateRankInfo();}
+            else {menuMusic.Stop();UpdateMusic(false);profileLoginRequired=true;profileSyncMessage="로그인하면 전적이 표시됩니다.";RefreshCentralProfile();UpdateRankInfo();}
           }
         }
       }catch(Exception ex){if(!closingLauncher&&!IsDisposed)
@@ -947,6 +960,7 @@ namespace KarmaLocal {
         string exe=Path.Combine(game,"KarmaSession.exe");File.WriteAllBytes(exe,bytes);
         SavePreferences();
         string node=NodePath();sessionLan=false;
+        menuMusic.Stop();UpdateMusic(false);
         sessionStartedUtc=DateTime.UtcNow;sessionError="";
         sessionHelper=Process.Start(new ProcessStartInfo{FileName=node,Arguments="\""+Path.Combine(support,"runtime.mjs")+"\" \""+exe+"\""+(modes.SelectedIndex==3?" --ai":""),
           WorkingDirectory=game,UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
