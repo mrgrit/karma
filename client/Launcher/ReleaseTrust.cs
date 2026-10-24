@@ -3,5 +3,5 @@ namespace KarmaLocal { internal static class ReleaseTrust {
  internal const string CertificateSha256 = "6e207bc8a75b31e960692e0f6bd2c2140cdb89df6d43aea8070224b3e26ce9c7";
  internal const string Origin = "https://192.168.12.100:29021";
  internal const string GameBuild = "karma290-central6";
- internal const string Version = "0.7.5";
+ internal const string Version = "0.7.6";
 } }

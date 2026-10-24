@@ -11,6 +11,17 @@
   const release=object=>{if(object&&!object.isNull())com(object,2,'uint',[])(object);};
   const verify=(hr,operation)=>{if(hr<0)throw Error(operation+' failed: 0x'+(hr>>>0).toString(16));};
   let pending=null,prepared=null,saving=false;const hooks=new Set(),retained=[];
+  // Native F12 prints an uninitialized filename before our deferred capture.
+  // Suppress that eager notification and report only after the encoder returns.
+  const notice= P('0x41af97');check(notice,[0x8b,0x0d,0x64,0x8d,0x54,0x00]);
+  Memory.patchCode(notice,6,p=>p.writeByteArray([0xe9,0x29,0,0,0,0x90]));
+  let owner=null;
+  const ownerHook=Interceptor.attach(P('0x41af70'),{onEnter(){owner=this.context.ecx;}});
+  const message=Memory.alloc([189, 186, 197, 169, 184, 176, 188, 166, 32, 192, 250, 192, 229, 32, 191, 207, 183, 225, 58, 32, 68, 97, 116, 97, 47, 83, 99, 114, 101, 101, 110, 83, 104, 111, 116, 0].length);message.writeByteArray([189, 186, 197, 169, 184, 176, 188, 166, 32, 192, 250, 192, 229, 32, 191, 207, 183, 225, 58, 32, 68, 97, 116, 97, 47, 83, 99, 114, 101, 101, 110, 83, 104, 111, 116, 0]);
+  const empty=Memory.allocUtf8String('');
+  const ticks=new NativeFunction(P('0x52c36c').readPointer(),'uint',[],'stdcall');
+  const notify=new NativeFunction(P('0x42cb80'),'void',['pointer','uint','pointer','pointer','int'],'thiscall');
+
   function copyPath(value){const bytes=[];for(let i=0;i<32768;i++){const b=value.add(i).readU8();bytes.push(b);if(!b){const copy=Memory.alloc(bytes.length);copy.writeByteArray(bytes);return copy;}}throw Error('Screenshot path too long');}
   function readFrame(device){
     let back=null,surface=null,locked=false,result=null;
@@ -39,7 +50,7 @@
     finally{if(locked)com(surface,10,'int',[])(surface);release(surface);release(back);}
   }
   retained.push(new NativeCallback((self,mode,width,height,path)=>{
-    if(!pending&&!saving)try{pending={self,mode,path:copyPath(path)};send({event:'screenshot-requested',source:'F12'});}catch(error){send({event:'screenshot-failed',message:String(error)});}
+    if(!pending&&!saving)try{pending={self,mode,owner,path:copyPath(path)};send({event:'screenshot-requested',source:'F12'});}catch(error){send({event:'screenshot-failed',message:String(error)});}
   },'void',['pointer','int','int','int','pointer'],'thiscall'));
   Interceptor.replace(saveAddress,retained[0]);
   retained.push(new NativeCallback(()=>{const data=prepared;prepared=null;return data||P(0);},'pointer',['pointer','int','int','int'],'thiscall'));
@@ -48,11 +59,12 @@
   const captureCall=P('0x4e28df');check(captureCall,[0xe8,0x8c,0xfd,0xff,0xff]);
   const displacement=retained[1].toUInt32()-(captureCall.toUInt32()+5);
   Memory.patchCode(captureCall,5,code=>code.writeByteArray([0xe8,displacement&255,(displacement>>>8)&255,(displacement>>>16)&255,(displacement>>>24)&255]));
+  retained.push(ownerHook);
   function bindDevice(device){
     const present=device.readPointer().add(15*4).readPointer(),key=String(present);if(hooks.has(key))return;hooks.add(key);
     retained.push(Interceptor.attach(present,{onEnter(args){
       if(!pending||saving)return;const request=pending;pending=null;saving=true;
-      try{const frame=readFrame(args[0]);prepared=frame.dib;saveOriginal(request.self,request.mode,frame.width,frame.height,request.path);send({event:'screenshot-rendered',width:frame.width,height:frame.height,format:frame.format});}
+      try{const frame=readFrame(args[0]);prepared=frame.dib;saveOriginal(request.self,request.mode,frame.width,frame.height,request.path);if(request.owner&&!request.owner.isNull())notify(request.owner.add(0x158).readPointer(),ticks(),message,empty,2);send({event:'screenshot-rendered',width:frame.width,height:frame.height,format:frame.format});}
       catch(error){send({event:'screenshot-failed',message:String(error)});}
       finally{if(prepared){free(prepared);prepared=null;}saving=false;}
     }}));
@@ -67,3 +79,5 @@
   }}));
   send({event:'screenshot-backbuffer-ready',version:2});
 })();
+
+

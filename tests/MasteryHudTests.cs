@@ -13,6 +13,7 @@ class MasteryHudTests {
    int height=width*3/4;var b=CoinHud.HudBounds(width,height,dpi);
    Check(b.Left>=0&&b.Right<=width&&b.Top>=0&&b.Bottom<=height,"inside game viewport");
    Check(b.Height<=height*.08&&b.Width<=width*.46,"small peripheral footprint at any DPI");
+   Check(b.Top>=Math.Ceiling(height*100/600f)+1,"coin must be below native portrait and health panel");
    Check(!b.Contains(width/2,height/2),"never covers crosshair");
    var loot=LootHintHud.HudBounds(width,height,dpi);
    Check(loot.Left>=width*.25&&loot.Right<=width*.75,"loot avoids native weapon and inventory at right");

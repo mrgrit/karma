@@ -65,7 +65,9 @@ namespace KarmaLocal {
     public static Rectangle HudBounds(int width,int height,float dpiScale){
       float scale=Math.Max(.75f,Math.Min(dpiScale,Math.Min(width/800f,height/600f)));
       int w=Math.Min(width,(int)(190*scale)),h=(int)(22*scale),gap=(int)(12*scale);
-      return new Rectangle(gap,(int)(60*scale),w,h);
+      // Native portrait/health panel occupies the first 100/600 of the frame.
+      int portraitBottom=(int)Math.Ceiling(height*100/600f);
+      return new Rectangle(gap,portraitBottom+gap,w,h);
     }
     void UpdateHud() {
       try {

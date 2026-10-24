@@ -15,6 +15,25 @@ using System.Windows.Forms;
 using System.Web.Script.Serialization;
 
 namespace KarmaLocal {
+  public static class InputSettingsDialog {
+    public static void Show(IWin32Window owner){
+      var serializer=new JavaScriptSerializer();
+      string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"KarmaLAN"),file=Path.Combine(folder,"input-settings.json");
+      var settings=new Dictionary<string,object>();try{settings=serializer.Deserialize<Dictionary<string,object>>(File.ReadAllText(file));}catch{}
+      bool remote=SystemInformation.TerminalServerSession;object value;
+      if(settings.TryGetValue("remoteMode",out value)&&value is bool)remote=(bool)value;
+      decimal sensitivity=remote?25:100;try{if(settings.TryGetValue("sensitivity",out value))sensitivity=Convert.ToDecimal(value)*100;}catch{}
+      using(var dialog=new Form{Text="이 PC의 마우스 · 화면",ClientSize=new Size(460,240),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,Font=new Font("Malgun Gothic",10)}){
+        var mode=new CheckBox{Text="원격 호환 모드 · 원본 800×600 화면 유지",Checked=remote,Left=20,Top=20,Width=420};
+        var label=new Label{Text="마우스 감도 (%)",Left=20,Top=66,Width=200};
+        var amount=new NumericUpDown{Minimum=5,Maximum=200,Value=Math.Max(5,Math.Min(200,sensitivity)),Increment=5,Left=230,Top=62,Width=100};
+        var help=new Label{Text="다음 게임 실행부터 적용됩니다. 원격 접속에서는\n감도 25%부터 조절해 보세요. 이 PC에만 저장됩니다.",Left=20,Top=108,Width=420,Height=56};
+        var save=new Button{Text="저장",Left=320,Top=180,Width=110,DialogResult=DialogResult.OK};
+        dialog.Controls.AddRange(new Control[]{mode,label,amount,help,save});dialog.AcceptButton=save;
+        if(dialog.ShowDialog(owner)==DialogResult.OK){Directory.CreateDirectory(folder);File.WriteAllText(file,serializer.Serialize(new {remoteMode=mode.Checked,sensitivity=(double)amount.Value/100}),Encoding.UTF8);}
+      }
+    }
+  }
   public sealed class PauseWindow : Form {
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
     readonly string commandPath;
@@ -29,7 +48,7 @@ namespace KarmaLocal {
          !Path.GetFileName(commandPath).StartsWith("pause-",StringComparison.Ordinal))
         throw new InvalidDataException("일시 정지 명령 경로가 올바르지 않습니다.");
       gameWindow=new IntPtr(Convert.ToInt64(hwnd.Replace("0x",""),16));gamePid=pid;
-      Text=lan?"카르마 · LAN 메뉴":"카르마 · 일시 정지";ClientSize=new Size(410,lan?265:190);FormBorderStyle=FormBorderStyle.FixedDialog;
+      Text=lan?"카르마 · LAN 메뉴":"카르마 · 일시 정지";ClientSize=new Size(410,lan?310:235);FormBorderStyle=FormBorderStyle.FixedDialog;
       AutoScaleMode=AutoScaleMode.Dpi;StartPosition=FormStartPosition.CenterScreen;
       MaximizeBox=false;MinimizeBox=false;TopMost=true;KeyPreview=true;
       BackColor=Color.FromArgb(21,29,35);ForeColor=Color.White;Font=new Font("Malgun Gothic",11);
@@ -40,6 +59,8 @@ namespace KarmaLocal {
       var matchStatus=new Label{Location=new Point(24,91),Size=new Size(362,80),ForeColor=Color.FromArgb(223,184,105)};
       if(lan){Controls.Add(matchStatus);resume.Top=190;exit.Top=190;}
       Controls.Add(resume);Controls.Add(exit);AcceptButton=resume;
+      var settingsButton=new Button{Text="마우스 · 화면 설정 (다음 게임부터 적용)",Location=new Point(24,lan?245:170),Size=new Size(362,36)};
+      settingsButton.Click+=(s,e)=>InputSettingsDialog.Show(this);Controls.Add(settingsButton);
       Action showConfirmation=()=>{
         confirmExit=true;Text="카르마 · 종료 확인";
         heading.Text=(lan?"대전을 종료하시겠습니까?":"사격 연습을 종료하시겠습니까?")+"\n내 코인   "+CoinHud.ReadBalance();
@@ -51,9 +72,9 @@ namespace KarmaLocal {
       resume.Click+=(s,e)=>Submit("resume");
       exit.Click+=(s,e)=>{if(confirmExit)Submit("quit");else showConfirmation();};
       KeyDown+=(s,e)=>{
-        if(e.KeyCode==Keys.F10||e.KeyCode==Keys.Escape){
+        if(e.KeyCode==Keys.F2||e.KeyCode==Keys.F10||e.KeyCode==Keys.Escape){
           e.Handled=true;e.SuppressKeyPress=true;
-          if(e.KeyCode==Keys.F10||confirmExit)Submit("resume");else showConfirmation();
+          if(e.KeyCode==Keys.F2||e.KeyCode==Keys.F10||confirmExit)Submit("resume");else showConfirmation();
         }
       };
       Shown+=(s,e)=>{Activate();resume.Focus();};
@@ -902,22 +923,7 @@ namespace KarmaLocal {
       return node;
     }
     void CancelLan(){lobbyLeaving=true;CloseLobby();try{File.WriteAllText(Path.Combine(support,"lan-cancel.json"),"{}",Encoding.UTF8);}catch{}}
-    void InputSettings(){
-      string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"KarmaLAN"),file=Path.Combine(folder,"input-settings.json");
-      var settings=new Dictionary<string,object>();try{settings=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(file));}catch{}
-      bool remote=SystemInformation.TerminalServerSession;object value;
-      if(settings.TryGetValue("remoteMode",out value)&&value is bool)remote=(bool)value;
-      decimal sensitivity=remote?25:100;try{if(settings.TryGetValue("sensitivity",out value))sensitivity=Convert.ToDecimal(value)*100;}catch{}
-      using(var dialog=new Form{Text="이 PC의 마우스 · 화면",ClientSize=new Size(460,240),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,Font=new Font("Malgun Gothic",10)}){
-        var mode=new CheckBox{Text="원격 호환 모드 · 원본 800×600 화면 유지",Checked=remote,Left=20,Top=20,Width=420};
-        var label=new Label{Text="마우스 감도 (%)",Left=20,Top=66,Width=200};
-        var amount=new NumericUpDown{Minimum=5,Maximum=200,Value=Math.Max(5,Math.Min(200,sensitivity)),Increment=5,Left=230,Top=62,Width=100};
-        var help=new Label{Text="다음 게임 실행부터 적용됩니다. 원격 접속에서는\n감도 25%부터 조절해 보세요. 이 PC에만 저장됩니다.",Left=20,Top=108,Width=420,Height=56};
-        var save=new Button{Text="저장",Left=320,Top=180,Width=110,DialogResult=DialogResult.OK};
-        dialog.Controls.AddRange(new Control[]{mode,label,amount,help,save});dialog.AcceptButton=save;
-        if(dialog.ShowDialog(this)==DialogResult.OK){Directory.CreateDirectory(folder);File.WriteAllText(file,json.Serialize(new {remoteMode=mode.Checked,sensitivity=(double)amount.Value/100}),Encoding.UTF8);}
-      }
-    }
+    void InputSettings(){InputSettingsDialog.Show(this);}
     void RoomServer(out string host,out int port){
       var selected=ReadSupportJson("server-selection.json");object value;IPAddress address;
       host=selected!=null&&selected.TryGetValue("host",out value)?Convert.ToString(value):"192.168.12.100";
