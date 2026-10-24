@@ -18,11 +18,11 @@ const proximity=()=>c.leave(c.enter(0x452540,[c.p(10)],c.m,
  {returnAddress:c.p(0x4526b1),context:{ecx:c.m,ebx:c.p(0)}}),c.p(1));
 c.rpc.lanreceive({version:1,type:'drop',drop});c.tick();
 proximity();proximity();assert.equal(claims('pickup-claim').length,0,'proximity cannot auto-pickup');
-assert(c.events.find(e=>e.event==='lan-loot-hint'&&e.message.includes('MP40 · 400점 · 2/5발')));
+assert(c.events.find(e=>e.event==='lan-loot-hint'&&e.message.includes('[E] MP40 · 2/5')&&e.ttlMs===900&&!e.message.includes('\n')));
 key(0x12,true);c.tick();assert.equal(claims('pickup-claim').length,1,'E sends explicit pickup');
 c.tick();proximity();assert.equal(claims('pickup-claim').length,1,'held E cannot repeat');
 c.rpc.lanreceive({version:1,type:'pickup-denied',dropId:drop.id,reason:'loadout: budget exceeded'});c.tick();
-assert(c.events.find(e=>e.event==='lan-loot-hint'&&e.message.includes('인벤토리 점수가 부족')));
+assert(c.events.find(e=>e.event==='lan-loot-hint'&&e.message.includes('장비 조건 불충족')));
 const ownedBefore=c.local.add(0x298+9*56).readS32();
 c.local.add(0x2a4+9*56).writeS32(3);c.local.add(0x29c+9*56).writeS32(260);
 key(0x12,false);key(0x22,true);c.tick();

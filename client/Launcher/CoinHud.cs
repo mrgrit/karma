@@ -32,7 +32,7 @@ namespace KarmaLocal {
     public CoinHud(int game,int parent) {
       gamePid=game;parentPid=parent;Text="카르마 · 내 코인";
       FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;AutoScaleMode=AutoScaleMode.None;
-      BackColor=Color.FromArgb(20,27,35);ForeColor=Color.FromArgb(244,206,124);Opacity=.9;DoubleBuffered=true;
+      BackColor=Color.Magenta;TransparencyKey=BackColor;ForeColor=Color.FromArgb(244,206,124);Opacity=.9;DoubleBuffered=true;
       ClientSize=new Size(230,44);StartPosition=FormStartPosition.Manual;Location=new Point(-10000,-10000);
       chat=new ChatHud(gamePid);
       feed=new KillFeedHud(gamePid);
@@ -53,8 +53,18 @@ namespace KarmaLocal {
         object id,until,text;
         if(!value.TryGetValue("gamePid",out id)||Convert.ToInt32(id)!=gamePid||!value.TryGetValue("expiresAt",out until)||
           Convert.ToDouble(until)<(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds||!value.TryGetValue("message",out text))return "";
-        string result=Convert.ToString(text);return result.Length>500?result.Substring(0,500):result;
+        return CompactLootHint(Convert.ToString(text));
       }catch{return "";}
+    }
+    public static string CompactLootHint(string message){
+      if(String.IsNullOrWhiteSpace(message))return "";
+      string line=message.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries)[0];
+      return line.Length>64?line.Substring(0,63)+"…":line;
+    }
+    public static Rectangle HudBounds(int width,int height,float dpiScale){
+      float scale=Math.Max(.75f,Math.Min(dpiScale,Math.Min(width/800f,height/600f)));
+      int w=Math.Min(width,(int)(360*scale)),h=(int)(44*scale),gap=(int)(12*scale);
+      return new Rectangle(Math.Max(0,width-w-gap),Math.Max(0,height-(int)(126*scale)),w,h);
     }
     void UpdateHud() {
       try {
@@ -64,10 +74,10 @@ namespace KarmaLocal {
           if(hwnd==IntPtr.Zero||GetForegroundWindow()!=hwnd||IsIconic(hwnd)){if(Visible)Hide();return;}
           Rect rect;var origin=new PointNative();if(!GetClientRect(hwnd,out rect)||!ClientToScreen(hwnd,ref origin))return;
           string next=ReadBalance(),hint=ReadLootHint();
-          float scale=Math.Max(1f,GetDpiForWindow(hwnd)/96f);displayScale=scale;
-          int w=(int)((hint==""?230:440)*scale),h=(int)((hint==""?44:150)*scale),gap=(int)(12*scale);
-          SetWindowPos(Handle,new IntPtr(-1),origin.X+Math.Max(gap,rect.Right-w-gap),origin.Y+(int)(112*scale),w,h,0x0010);
-          if(next!=balance||hint!=lootHint){balance=next;lootHint=hint;Invalidate();}
+          float scale=Math.Max(.75f,Math.Min(GetDpiForWindow(hwnd)/96f,Math.Min(rect.Right/800f,rect.Bottom/600f)));bool scaleChanged=displayScale!=scale;displayScale=scale;
+          var bounds=HudBounds(rect.Right,rect.Bottom,scale);
+          SetWindowPos(Handle,new IntPtr(-1),origin.X+bounds.X,origin.Y+bounds.Y,bounds.Width,bounds.Height,0x0010);
+          if(next!=balance||hint!=lootHint||scaleChanged){balance=next;lootHint=hint;Invalidate();}
           if(!Visible)Show();
         }
       }catch(ArgumentException){Close();}catch(InvalidOperationException){Close();}
@@ -79,10 +89,17 @@ namespace KarmaLocal {
     }
     protected override void OnPaint(PaintEventArgs e) {
       base.OnPaint(e);float scale=displayScale;
-      using(var font=new Font("Malgun Gothic",14*scale,FontStyle.Bold,GraphicsUnit.Pixel))
-        TextRenderer.DrawText(e.Graphics,"내 코인   "+balance,font,new Rectangle(0,0,ClientSize.Width,(int)(44*scale)),ForeColor,TextFormatFlags.HorizontalCenter|TextFormatFlags.VerticalCenter|TextFormatFlags.NoPadding);
-      if(lootHint!="")using(var font=new Font("Malgun Gothic",13*scale,FontStyle.Regular,GraphicsUnit.Pixel))
-        TextRenderer.DrawText(e.Graphics,lootHint,font,new Rectangle((int)(14*scale),(int)(46*scale),ClientSize.Width-(int)(28*scale),ClientSize.Height-(int)(50*scale)),Color.White,TextFormatFlags.Left|TextFormatFlags.WordBreak|TextFormatFlags.NoPadding);
+      e.Graphics.TextRenderingHint=System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
+      using(var font=new Font("Malgun Gothic",12*scale,FontStyle.Bold,GraphicsUnit.Pixel))
+      using(var format=new StringFormat{Alignment=StringAlignment.Far,LineAlignment=StringAlignment.Center,FormatFlags=StringFormatFlags.NoWrap,Trimming=StringTrimming.EllipsisCharacter}){
+        string[] lines={"내 코인 · "+balance,lootHint};
+        for(int i=0;i<lines.Length;i++){
+          var area=new RectangleF(0,22*scale*i,ClientSize.Width-2,22*scale);
+          var shadow=area;shadow.Offset(1,1);
+          e.Graphics.DrawString(lines[i],font,Brushes.Black,shadow,format);
+          using(var brush=new SolidBrush(i==0?ForeColor:Color.White))e.Graphics.DrawString(lines[i],font,brush,area,format);
+        }
+      }
     }
   }
 }

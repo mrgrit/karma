@@ -32,9 +32,10 @@
   });
   Interceptor.attach(ptr('0x451380'), {onEnter(){if (dirty) apply();}});
   rpc.exports = Object.assign(rpc.exports || {}, {
-    accountrank(rank) {
+    accountrank(rank,inventoryCapacity) {
       if (!Object.prototype.hasOwnProperty.call(rankIds, rank?.id)) throw Error('Invalid account rank');
       localRank = {id:rank.id}; dirty = true;
+      if(cfg?.equipmentCatalog&&Number.isSafeInteger(inventoryCapacity)&&inventoryCapacity>=0&&inventoryCapacity<=200000)cfg.equipmentCatalog.inventoryCapacity=inventoryCapacity;
       return {queued:true};
     }
   });

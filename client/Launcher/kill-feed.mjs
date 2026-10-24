@@ -7,7 +7,7 @@ export function addKillFeed(events,feed,now=Date.now()){
   const clean=value=>String(value||'').replace(/[\x00-\x1f\x7f]/g,' ').slice(0,80);
   events.push({id:feed.id,kind:feed.kind,killerId:clean(feed.killerId),victimId:feed.victimId,
     killerName:clean(feed.killerName),victimName:clean(feed.victimName),weaponName:clean(feed.weaponName),
-    headshot:feed.kind==='kill'&&feed.headshot===true,receivedAt:now});
+    techniqueName:clean(feed.techniqueName),headshot:feed.kind==='kill'&&feed.headshot===true,receivedAt:now});
   if(events.length>80)events.splice(0,events.length-80);
   return true;
 }

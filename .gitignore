@@ -18,3 +18,8 @@ tests/native-eight-*.jsonl
 client/Launcher/loot-hint.json
 client/Launcher/lan-lobby-command.json*
 client/Launcher/lan-lobby-result.json
+
+# Private release signing keys must never be committed
+release-signing/
+*.private.pem
+release-*.pem

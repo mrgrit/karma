@@ -37,7 +37,7 @@ namespace KarmaLocal {
     }
     public static string Line(Dictionary<string,object> item){
       string victim=ChatFiles.Read(item,"victimName"),kind=ChatFiles.Read(item,"kind");
-      if(kind=="kill")return ChatFiles.Read(item,"killerName")+" → "+victim+"  ·  "+ChatFiles.Read(item,"weaponName")+" 해킹";
+      if(kind=="kill")return ChatFiles.Read(item,"killerName")+" → "+victim+"  ·  "+ChatFiles.Read(item,"weaponName")+" · "+(String.IsNullOrEmpty(ChatFiles.Read(item,"techniqueName"))?"해킹":ChatFiles.Read(item,"techniqueName"));
       if(kind=="self")return victim+"  ·  자멸 ("+ChatFiles.Read(item,"weaponName")+")";
       return victim+"  ·  사망";
     }

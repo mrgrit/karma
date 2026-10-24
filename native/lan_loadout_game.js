@@ -18,10 +18,14 @@ function lootHint(phase,message,d,extra={}){
  const inventoryScore=(loot.inventory||[]).filter(w=>w!==255).reduce((n,w)=>n+cost(w),0);
  const weaponCost=d?cost(d.weapon):0,capacity=catalog.inventoryCapacity;
  const projectedScore=inventoryScore+((loot.inventory||[]).includes(d?.weapon)?0:weaponCost);
- if(phase==='nearby'&&item&&Number.isFinite(capacity))message=(item.name||('무기 '+d.weapon))+' · '+weaponCost+'점 · '+d.magazine+'/'+d.reserve+'발\n'+
-  '줍기 후 '+projectedScore+' / 한도 '+capacity+'점'+(projectedScore>capacity?' (한도 초과)':'')+'\n'+
-  ((loot.inventory||[]).includes(d.weapon)?'이미 보유 중 · G로 먼저 버린 뒤 E로 줍기':'E: 줍기 · G: 현재 무기 버리기');
- send({event:'lan-loot-hint',phase,message,ttlMs:3500,weapon:d?.weapon,
+ if(phase==='nearby'&&item){
+  const owned=(loot.inventory||[]).includes(d.weapon),full=Number.isFinite(capacity)&&projectedScore>capacity;
+  message=(owned?'보유 중 · ':full?'점수 부족 · ':'[E] ')+(item.name||('무기 '+d.weapon))+' · '+d.magazine+'/'+d.reserve;
+ }
+ if(phase==='picked')message='획득 · '+(item?.name||'무기');
+ if(phase==='dropped')message='무기를 버렸습니다';
+ if(phase==='pending')message='장비 확인 중…';
+ send({event:'lan-loot-hint',phase,message,ttlMs:phase==='nearby'?900:1800,weapon:d?.weapon,
   magazine:d?.magazine,reserve:d?.reserve,inventory:[...(loot.inventory||[])],inventoryScore,weaponCost,projectedScore,capacity,...extra});
 }
 function lootKeys(){
@@ -251,16 +255,16 @@ function lootMessage(x){
  else if(x.type==='pickup-denied'){
   const d=loot.drops.get(x.dropId);if(d)d.pending=false;
   const reason=String(x.reason||'');
-  const message=reason==='weapon-already-owned'?'이미 가진 무기입니다. 먼저 G로 버린 뒤 E로 주우세요.':
-   reason.includes('loadout')?'인벤토리 점수가 부족합니다. 버릴 총을 선택하고 G를 누른 뒤 E로 주우세요.':
-   reason.includes('distance')||reason.includes('far')||reason==='out-of-range'?'무기에 더 가까이 다가가서 E를 눌러 주세요.':
-   reason.includes('claimed')||reason.includes('missing')?'다른 플레이어가 이미 주운 무기입니다.':'지금은 이 무기를 주울 수 없습니다.';
+  const message=reason==='weapon-already-owned'?'이미 보유 · G로 버린 뒤 E로 줍기':
+   reason.includes('loadout')?'장비 조건 불충족 · G로 비운 뒤 E':
+   reason.includes('distance')||reason.includes('far')||reason==='out-of-range'?'거리가 멉니다 · 가까이에서 E':
+   reason.includes('claimed')||reason.includes('missing')?'다른 플레이어가 먼저 획득했습니다':'지금은 이 무기를 주울 수 없습니다.';
   lootHint('denied',message,d,{reason});
  }
  else if(x.type==='drop-grant')applyDropGrant(x.grant);
  else if(x.type==='drop-denied'){
   if(loot.pendingDrop?.requestId===x.requestId)loot.pendingDrop=null;
-  lootHint('denied','지금은 이 무기를 버릴 수 없습니다. 총을 다시 선택하고 G를 눌러 주세요.',null,{reason:String(x.reason||'')});
+  lootHint('denied','버릴 수 없음 · 총 선택 후 G',null,{reason:String(x.reason||'')});
  }
 }
 function clearDrops(){for(const id of [...loot.drops.keys()])removeDrop(id);}
@@ -277,7 +281,7 @@ Interceptor.attach(P(0x452540),{
   // The original routine already checked <300 native units and line of
   // sight. Keep that evidence; proximity alone never awards or claims loot.
   d.nearbyAt=now();const nearest=nearestLoot();
-  if(nearest&&(loot.nearby!==nearest.id||now()-loot.lastHint>=3000)){
+  if(nearest&&(loot.nearby!==nearest.id||now()-loot.lastHint>=600)){
    loot.nearby=nearest.id;loot.lastHint=now();
    lootHint('nearby','E: 바닥 무기 줍기 · G: 현재 무기 버리기',nearest);
   }

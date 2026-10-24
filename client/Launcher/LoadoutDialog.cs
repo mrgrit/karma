@@ -43,7 +43,7 @@ namespace KarmaLocal {
     readonly ToolTip tips=new ToolTip();
     Dictionary<string,object> data, characterData;
     string assetRoot, restoredNotice="";
-    int emptyId=255, originalCapacity, rankBonus, userXp;
+    int emptyId=255, originalCapacity, rankBonus, userXp, rankXp;
     bool updating;
     ComboBox starting;
     Label total, reason;
@@ -52,9 +52,9 @@ namespace KarmaLocal {
     TableLayoutPanel scrollContent;
 
     public LoadoutDialog(string gameRoot,string support,CatalogItem character,int xp,
-      Dictionary<string,object> saved=null) {
+      Dictionary<string,object> saved=null,int? qualifiedRankXp=null) {
       Inventory=new int[]{50,9,1,6,48,24,18}; SelectedWeapon=9; RankName="";
-      userXp=Math.Max(0,xp);
+      userXp=Math.Max(0,xp);rankXp=Math.Max(0,qualifiedRankXp??userXp);
       Text="카르마 · 출전 장비";
       Font=new Font("Malgun Gothic",9F);
       AutoScaleDimensions=new SizeF(96F,96F);
@@ -92,10 +92,10 @@ namespace KarmaLocal {
         LoadWeapons();
         LoadBudget();
         int unlockXp=Number(characterData,"unlockXp",0);
-        if(userXp<unlockXp){
+        if(rankXp<unlockXp){
           BuildUnavailable(character.Name+" · "+RankAt(unlockXp)+"부터 선택 가능",
             "현재 "+RankName+" · XP "+userXp.ToString("N0")+" / 필요 XP "+unlockXp.ToString("N0")+
-            "\n"+TextOf(characterData,"roleName")+" 병과입니다. 전적을 쌓으면 이 캐릭터가 해금됩니다.");
+            "\n"+TextOf(characterData,"roleName")+" 병과입니다. XP와 승급 기법 숙련 조건을 충족하면 해금됩니다.");
           return;
         }
         Build(character);
@@ -161,7 +161,7 @@ namespace KarmaLocal {
       if(originalCapacity<0||originalCapacity>100000)
         throw new InvalidDataException("캐릭터 장비 능력치가 올바르지 않습니다.");
       var ranks=ArrayOf(data,"ranks").OfType<Dictionary<string,object>>()
-        .Where(r=>Number(r,"minXp",-1)>=0&&Number(r,"minXp",-1)<=userXp)
+        .Where(r=>Number(r,"minXp",-1)>=0&&Number(r,"minXp",-1)<=rankXp)
         .OrderBy(r=>Number(r,"minXp",0)).ToArray();
       if(ranks.Length==0)throw new InvalidDataException("현재 계급 정보를 찾을 수 없습니다.");
       var rank=ranks[ranks.Length-1];
@@ -230,7 +230,7 @@ namespace KarmaLocal {
         var all=new HashSet<int>(IntArray(s,"allowedIds"));
         int[] permitted=permissions!=null&&permissions.ContainsKey(key)?IntArray(permissions,key):all.ToArray();
         var allowed=new HashSet<int>(permitted.Where(id=>all.Contains(id)&&weapons.ContainsKey(id)));
-        if(key=="pistol"&&dual!=null&&userXp<Number(dual,"minXp",6000))
+        if(key=="pistol"&&dual!=null&&rankXp<Number(dual,"minXp",6000))
           allowed.ExceptWith(IntArray(dual,"cannonIds"));
         bool optional=Flag(s,"optional")||optionalSlots.Contains(key);if(optional)allowed.Add(emptyId);
         int defaultId=defaultsByCharacter.Length==7?defaultsByCharacter[i]:Number(s,"defaultId",-1);
@@ -276,8 +276,8 @@ namespace KarmaLocal {
       buttons.Controls.Add(apply);buttons.Controls.Add(cancel);buttons.Controls.Add(defaults);
       if(dual!=null&&TextOf(characterData,"role")==TextOf(dual,"role","heavy")){
         int needed=Number(dual,"minXp",6000);
-        var twin=MakeButton(userXp>=needed?"쌍포 구성":"쌍포 · "+RankAt(needed)+"부터");
-        twin.Enabled=userXp>=needed;buttons.Controls.Add(twin);
+        var twin=MakeButton(rankXp>=needed?"쌍포 구성":"쌍포 · "+RankAt(needed)+"부터");
+        twin.Enabled=rankXp>=needed;buttons.Controls.Add(twin);
         tips.SetToolTip(twin,"두 포와 가벼운 자동화기로 구성하고, 방어·회복·수류탄과 권총을 비웁니다.");
         twin.Click+=(s,e)=>ApplyDualPreset(dual);
       }
@@ -351,7 +351,7 @@ namespace KarmaLocal {
     void ApplyDualPreset(Dictionary<string,object> dual){
       var cannonIds=IntArray(dual,"cannonIds");
       var preset=IntArray(dual,"defaultInventory");
-      if(cannonIds.Length!=2||preset.Length!=7||userXp<Number(dual,"minXp",6000))return;
+      if(cannonIds.Length!=2||preset.Length!=7||rankXp<Number(dual,"minXp",6000))return;
       if(rows.Any(row=>!row.Allowed.Contains(preset[row.Index])))return;
       updating=true;
       foreach(var row in rows)row.Picker.SelectedItem=weapons[preset[row.Index]];
@@ -421,7 +421,7 @@ namespace KarmaLocal {
           problems.Add("보조포 슬롯은 쌍포 전용입니다. 특수무기에도 다른 로켓포를 장착하거나 보조포를 비워 주세요.");
         if(cannonCount>1){
           int requiredXp=Number(dual,"minXp",6000);
-          if(TextOf(characterData,"role")!=TextOf(dual,"role","heavy")||userXp<requiredXp)
+          if(TextOf(characterData,"role")!=TextOf(dual,"role","heavy")||rankXp<requiredXp)
             problems.Add("쌍포는 중화기 병과 "+RankAt(requiredXp)+" (XP "+requiredXp.ToString("N0")+")부터 사용할 수 있습니다.");
           if(cannonCount>Number(dual,"maxCannons",2))problems.Add("로켓포는 최대 두 개까지 장착할 수 있습니다.");
           var light=new HashSet<int>(IntArray(dual,"lightAutomaticIds"));

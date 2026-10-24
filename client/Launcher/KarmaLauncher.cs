@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -283,7 +283,7 @@ namespace KarmaLocal {
     DateTime sessionStartedUtc;
     FormWindowState restoreState=FormWindowState.Normal;
     string sessionError="";
-    int profileXp;
+    int profileXp,profileRankXp;
     Color accent=Color.FromArgb(222,181,100), ink=Color.FromArgb(235,238,235), muted=Color.FromArgb(153,167,171);
     public Launcher() {
       root=AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar);
@@ -456,12 +456,12 @@ namespace KarmaLocal {
     }
     bool PublicMap(CatalogItem item){var data=MultiplayerMap(item);object ready;return data!=null&&data.TryGetValue("publicReady",out ready)&&ready is bool&&(bool)ready;}
     Dictionary<string,object> CharacterDefinition(CatalogItem item){return item==null?null:JsonDict(JsonDict(loadoutData,"characters"),item.Id);}
-    bool CharacterUnlocked(CatalogItem item){return item!=null&&(item.Age!=0?IsAdmin:CharacterDefinition(item)!=null&&profileXp>=JsonNumber(CharacterDefinition(item),"unlockXp",0));}
+    bool CharacterUnlocked(CatalogItem item){return item!=null&&(item.Age!=0?IsAdmin:CharacterDefinition(item)!=null&&profileRankXp>=JsonNumber(CharacterDefinition(item),"unlockXp",0));}
     string CharacterRole(CatalogItem item){var data=CharacterDefinition(item);object value;return data!=null&&data.TryGetValue("roleName",out value)?Convert.ToString(value):CampName(item);}
     string CharacterUnlockText(CatalogItem item){
       var data=CharacterDefinition(item);int required=JsonNumber(data,"unlockXp",0);string rank="훈련병";object entries,value;
       if(loadoutData!=null&&loadoutData.TryGetValue("ranks",out entries)&&entries is IEnumerable)foreach(var entry in (IEnumerable)entries){var r=entry as Dictionary<string,object>;if(JsonNumber(r,"minXp",-1)==required&&r.TryGetValue("name",out value))rank=Convert.ToString(value);}
-      return rank+" · XP "+required.ToString("N0");
+      return rank+" · XP "+required.ToString("N0")+" 및 기법 숙련";
     }
     int MapIndex(CatalogItem item) {
       if(item==null)return -1;
@@ -678,6 +678,7 @@ namespace KarmaLocal {
       var cached=ReadSupportJson("central-profile.json");
       cachedProfile=profileLoginRequired?null:JsonDict(cached,"profile")??cached;
       profileXp=Math.Max(0,JsonNumber(cachedProfile,"xp",0));
+      profileRankXp=Math.Max(0,JsonNumber(cachedProfile,"rankXp",profileXp));
       UpdateAccountCaption();
       UpdateMyStats();
       if(!initializing&&maps!=null&&modes!=null){SelectDefaults();RefreshCards();}
@@ -693,7 +694,7 @@ namespace KarmaLocal {
       string rank="훈련병";int threshold=-1;object rankValues;
       if(loadoutData!=null&&loadoutData.TryGetValue("ranks",out rankValues)&&rankValues is IEnumerable)foreach(var entry in (IEnumerable)rankValues){
         var item=entry as Dictionary<string,object>;int min=JsonNumber(item,"minXp",-1);
-        if(min>=0&&min<=profileXp&&min>threshold){threshold=min;if(item.TryGetValue("name",out value))rank=Convert.ToString(value);}
+        if(min>=0&&min<=profileRankXp&&min>threshold){threshold=min;if(item.TryGetValue("name",out value))rank=Convert.ToString(value);}
       }
       int wins=Math.Max(0,JsonNumber(cachedProfile,"wins",0)),losses=Math.Max(0,JsonNumber(cachedProfile,"losses",0)),draws=Math.Max(0,JsonNumber(cachedProfile,"draws",0));
       int kills=Math.Max(0,JsonNumber(cachedProfile,"kills",0)),deaths=Math.Max(0,JsonNumber(cachedProfile,"deaths",0));
@@ -717,7 +718,7 @@ namespace KarmaLocal {
         if(!IPAddress.TryParse(host,out address)||address.AddressFamily!=AddressFamily.InterNetwork||address.Equals(IPAddress.Any)||address.Equals(IPAddress.Broadcast))host="192.168.12.100";
         int port=JsonNumber(selected,"port",29020);if(port<1||port>65534)port=29020;
         await RefreshServerProfile(host,port,true);
-      }catch(AccountRequiredException){cachedProfile=null;profileXp=0;profileSyncMessage="로그인하면 전적이 표시됩니다.";}
+      }catch(AccountRequiredException){cachedProfile=null;profileXp=0;profileRankXp=0;profileSyncMessage="로그인하면 전적이 표시됩니다.";}
       catch{profileSyncMessage=cachedProfile==null?"서버 연결 확인 필요":"저장된 기록 · 서버 연결 확인 필요";}
       finally{refreshingStats=false;if(!closingLauncher&&!IsDisposed){UpdateAccountCaption();UpdateRankInfo();UpdateMyStats();UpdateRunning();}}
     }
@@ -738,7 +739,7 @@ namespace KarmaLocal {
         foreach(var entry in ((IEnumerable)rankValues).Cast<object>()){
           var item=entry as Dictionary<string,object>;
           int threshold=JsonNumber(item,"minXp",-1);
-          if(threshold>=0&&threshold<=profileXp&&threshold>=bestThreshold){
+          if(threshold>=0&&threshold<=profileRankXp&&threshold>=bestThreshold){
             object name;rank=item.TryGetValue("name",out name)?Convert.ToString(name):"훈련병";
             bonus=Math.Max(0,JsonNumber(item,"budgetBonus",0));bestThreshold=threshold;
           }
@@ -756,7 +757,7 @@ namespace KarmaLocal {
       var all=ReadSupportJson("loadout-selection.json")??new Dictionary<string,object>();
       var byCharacter=JsonDict(all,"characters")??new Dictionary<string,object>();
       var saved=JsonDict(byCharacter,character.Id);
-      using(var dialog=new LoadoutDialog(game,support,character,profileXp,saved)){
+      using(var dialog=new LoadoutDialog(game,support,character,profileXp,saved,profileRankXp)){
         if(show&&dialog.ShowDialog(lobby!=null&&!lobby.IsDisposed?(IWin32Window)lobby:this)!=DialogResult.OK)return null;
         if(!dialog.SelectionValid)throw new InvalidOperationException("출전 장비를 확인할 수 없습니다. 장비 설정에서 병과와 예산을 확인해 주세요.");
         var selected=new Dictionary<string,object>{{"inventory",dialog.Inventory.ToArray()},

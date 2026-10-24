@@ -185,7 +185,7 @@ try{
     onProfile:profile=>{
       accountProfile=profile;
       fs.writeFileSync(path.join(support,'central-profile.json'),JSON.stringify(profile));
-      if(rpcReady&&!closing&&profile.rank)script.exports.accountrank(profile.rank).catch(error=>{
+      if(rpcReady&&!closing&&profile.rank)script.exports.accountrank(profile.rank,profile.inventoryCapacity??null).catch(error=>{
         if(!ended&&!closing)log('rank-update-warning',{message:String(error)});
       });
     },
