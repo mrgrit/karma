@@ -192,9 +192,14 @@ try{
       });
     },
     onMessage:message=>{
-      if(closing||matchResult)return;
+      if(closing||ended||matchResult||script?.isDestroyed)return;
       if(message.type==='leave'){stop('상대가 방을 나갔습니다.');return;}
-      if(rpcReady)script.exports.lanreceive(message).catch(error=>stop(String(error),true));
+      if(rpcReady)script.exports.lanreceive(message).catch(error=>{
+        // Native termination destroys the agent before the detach event may
+        // arrive. Preserve that event's actual cause instead of replacing it
+        // with a secondary RPC "Script is destroyed" error.
+        if(!ended&&!closing&&!script.isDestroyed)stop(String(error),true);
+      });
       else {
         if(message.type==='state'&&message.shot){
           const key=message.shot.life+':'+message.shot.id;
@@ -238,7 +243,7 @@ try{
   let inputSettings={};
   try{inputSettings=JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA||os.homedir(),'KarmaLAN','input-settings.json'),'utf8').replace(/^\uFEFF/,''));}catch{}
   let source='globalThis.KARMA_INPUT_SETTINGS='+JSON.stringify(inputSettings)+';\n'+'globalThis.KARMA_LAN_CONFIG='+JSON.stringify(lanConfig)+';\n';
-  for(const file of ['startup-diagnostics.js','legacy-controls.js','input-lan.js','native-font.js','offline-death.js','window-size.js','lan-game.js','rank-display.js','player-names.js'])
+  for(const file of ['startup-diagnostics.js','legacy-controls.js','input-lan.js','native-font.js','offline-death.js','window-size.js','screenshot-window.js','lan-game.js','rank-display.js','player-names.js'])
     source+='\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
   source+='\nrpc.exports.compatibilitystatus=()=>({ready:true});';
   script=await session.createScript(source);checkClosing();
@@ -264,7 +269,7 @@ try{
     if(payload.kind==='pause-requested'||payload.kind==='chat-requested')openMenu(payload);
   });
   const done=new Promise(resolve=>session.detached.connect((reason,crash)=>{
-    ended=true;closing=true;clearTimeout(startupTimer);clearTimeout(validationTimer);
+    ended=true;closing=true;rpcReady=false;clearTimeout(startupTimer);clearTimeout(validationTimer);
     cleanMenu();peer.close();log('game-ended',{reason,crash:crash?String(crash):null});
     status(failureReason||crash?'error':'ended',failureReason||(crash?'게임이 예기치 않게 종료되었습니다.':endReason||'대전이 종료되었습니다.'));
     resolve();

@@ -51,7 +51,7 @@ try {
   let source='globalThis.KARMA_INPUT_SETTINGS='+JSON.stringify(inputSettings)+';\n'+'globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\nglobalThis.KARMA_ACCOUNT_PROFILE='+JSON.stringify({rank:accountProfile.rank,name:accountProfile.name})+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('legacy-controls.js')+moduleSource('input-menu.js')+moduleSource('native-font.js');
   source+=moduleSource('offline-death.js');
   source+=moduleSource('practice-end.js');
-  source+=moduleSource('window-size.js');
+  source+=moduleSource('window-size.js')+moduleSource('screenshot-window.js');
   if(ai){
     if(!config.aiReady)throw new Error('AI mode is not available');
     source+=moduleSource('ai.js');

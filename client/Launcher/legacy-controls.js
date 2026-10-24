@@ -9,3 +9,17 @@
   Memory.patchCode(address, 2, code => code.writeByteArray([0xeb, 0x40]));
   send({event:'legacy-shortcut-guard-ready',key:'T',version:1});
 })();
+
+// Quick grenade (MOUSE3 / configurable GENERADE action) checks the retired
+// online account's feature flag before the native inventory/ammo checks.
+// That account pointer is null in LAN/practice. Skip only the online flag;
+// keep the original cooldown, grenade selection, ammo and throw animation.
+(() => {
+  const address = ptr('0x419b4c');
+  const expected = [0xa1,0x50,0x18,0x56,0x00,0x8a,0x88,0x3e,0x11,0x00,0x00,0x84,0xc9,0x74,0x52];
+  const original = Array.from(new Uint8Array(address.readByteArray(expected.length)));
+  if (!original.every((value,index)=>value===expected[index]))
+    throw Error('Unknown legacy quick-grenade instructions');
+  Memory.patchCode(address, expected.length, code => code.writeByteArray(Array(expected.length).fill(0x90)));
+  send({event:'legacy-shortcut-guard-ready',key:'quick-grenade',version:1});
+})();
