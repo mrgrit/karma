@@ -19,16 +19,16 @@ namespace KarmaLocal {
       object v;return state!=null&&state.TryGetValue("messages",out v)&&v is IEnumerable?((IEnumerable)v).Cast<object>().OfType<Dictionary<string,object>>().ToList():new List<Dictionary<string,object>>();
     }
     public static string Line(Dictionary<string,object> m){return (Read(m,"channel")=="team"?"[팀] ":"[전체] ")+Read(m,"name")+": "+Read(m,"text");}
-    public static void Send(string support,string channel,string text){
+    public static string Send(string support,string channel,string text){
       text=text.Trim();if(text.Length==0||text.Length>200)throw new InvalidDataException("채팅은 1~200자로 입력해 주세요.");
       if(channel!="all"&&channel!="team")throw new InvalidDataException("채팅 대상을 선택해 주세요.");
       string id=Guid.NewGuid().ToString("N"),file=Path.Combine(support,"pause-chat-send-"+DateTime.UtcNow.Ticks+"-"+id+".json");
-      File.WriteAllText(file+".tmp",new JavaScriptSerializer().Serialize(new {requestId=id,channel=channel,text=text}),Encoding.UTF8);File.Move(file+".tmp",file);
+      File.WriteAllText(file+".tmp",new JavaScriptSerializer().Serialize(new {requestId=id,channel=channel,text=text}),Encoding.UTF8);File.Move(file+".tmp",file);return id;
     }
   }
   public sealed class ChatPanel : UserControl {
     readonly string support;readonly RichTextBox history;readonly TextBox input;readonly ComboBox channel;readonly Label error;
-    readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer{Interval=250};string signature="";bool teamMode;
+    readonly System.Windows.Forms.Timer timer=new System.Windows.Forms.Timer{Interval=250};string signature="",pendingId="";DateTime pendingAt;bool teamMode;
     public event Action Sent;
     public ChatPanel(string directory){
       support=directory;Dock=DockStyle.Fill;Font=new Font("Malgun Gothic",10);MinimumSize=new Size(240,150);
@@ -46,10 +46,13 @@ namespace KarmaLocal {
     public void SetMode(string mode){bool next=mode=="tdm";if(next==teamMode)return;teamMode=next;int selected=channel.SelectedIndex;channel.Items.Clear();channel.Items.Add("전체");if(teamMode)channel.Items.Add("팀");channel.SelectedIndex=teamMode&&selected==1?1:0;}
     public void SelectChannel(string value){channel.SelectedIndex=value=="team"&&teamMode?1:0;}
     public void FocusInput(){input.Focus();}
-    void Send(){try{if(String.IsNullOrWhiteSpace(input.Text))return;ChatFiles.Send(support,channel.SelectedIndex==1?"team":"all",input.Text);input.Clear();error.Text="전송 요청됨 · Enter 전송";if(Sent!=null)Sent();}catch(Exception ex){error.Text=ex.Message;}}
+    void Send(){try{if(pendingId!=""||String.IsNullOrWhiteSpace(input.Text))return;pendingId=ChatFiles.Send(support,channel.SelectedIndex==1?"team":"all",input.Text);pendingAt=DateTime.UtcNow;error.Text="서버 전달 확인 중…";}catch(Exception ex){error.Text=ex.Message;}}
     public void RefreshMessages(){
       var state=ChatFiles.State(support);if(state==null)return;SetMode(ChatFiles.Read(state,"mode"));
-      var messages=ChatFiles.Messages(state);string next=String.Join("|",messages.Select(m=>ChatFiles.Read(m,"id")));
+      var messages=ChatFiles.Messages(state);
+      if(pendingId!=""&&messages.Any(m=>ChatFiles.Read(m,"requestId")==pendingId)){pendingId="";input.Clear();error.Text="전달 완료";if(Sent!=null){Sent();return;}}
+      else if(pendingId!=""&&(DateTime.UtcNow-pendingAt).TotalSeconds>8){pendingId="";error.Text="전달 확인 실패 · 연결을 확인한 뒤 다시 보내세요.";}
+      string next=String.Join("|",messages.Select(m=>ChatFiles.Read(m,"id")));
       if(next!=signature){signature=next;history.Clear();foreach(var m in messages){history.SelectionColor=ChatFiles.Read(m,"channel")=="team"?Color.FromArgb(131,205,255):Color.White;history.AppendText(ChatFiles.Line(m)+Environment.NewLine);}history.SelectionStart=history.TextLength;history.ScrollToCaret();}
       double at;double.TryParse(ChatFiles.Read(state,"errorAt"),out at);double now=(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds;
       if(now-at<6000)error.Text=ChatFiles.Read(state,"error");

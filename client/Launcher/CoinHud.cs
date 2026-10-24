@@ -23,6 +23,7 @@ namespace KarmaLocal {
     public static void InitializeDpi(){try{SetProcessDpiAwarenessContext(new IntPtr(-4));}catch(EntryPointNotFoundException){SetProcessDPIAware();}}
     readonly int gamePid,parentPid;
     readonly ChatHud chat;
+    readonly LootHintHud loot=new LootHintHud();
     readonly KillFeedHud feed;
     readonly Timer timer=new Timer {Interval=300};
     string balance="코인 조회 대기",lootHint="";
@@ -36,7 +37,7 @@ namespace KarmaLocal {
       ClientSize=new Size(230,44);StartPosition=FormStartPosition.Manual;Location=new Point(-10000,-10000);
       chat=new ChatHud(gamePid);
       feed=new KillFeedHud(gamePid);
-      timer.Tick+=(s,e)=>UpdateHud();Shown+=(s,e)=>{UpdateHud();chat.Show();feed.Show();};FormClosed+=(s,e)=>{timer.Dispose();chat.Close();feed.Close();};timer.Start();
+      timer.Tick+=(s,e)=>UpdateHud();Shown+=(s,e)=>{UpdateHud();chat.Show();feed.Show();};FormClosed+=(s,e)=>{timer.Dispose();chat.Close();feed.Close();loot.Close();};timer.Start();
     }
     public static string ReadBalance() {
       try {
@@ -63,18 +64,19 @@ namespace KarmaLocal {
     }
     public static Rectangle HudBounds(int width,int height,float dpiScale){
       float scale=Math.Max(.75f,Math.Min(dpiScale,Math.Min(width/800f,height/600f)));
-      int w=Math.Min(width,(int)(360*scale)),h=(int)(44*scale),gap=(int)(12*scale);
-      return new Rectangle(Math.Max(0,width-w-gap),Math.Max(0,height-(int)(126*scale)),w,h);
+      int w=Math.Min(width,(int)(190*scale)),h=(int)(22*scale),gap=(int)(12*scale);
+      return new Rectangle(gap,(int)(60*scale),w,h);
     }
     void UpdateHud() {
       try {
         using(var parent=Process.GetProcessById(parentPid))if(parent.HasExited){Close();return;}
         using(var game=Process.GetProcessById(gamePid)) {
           if(game.HasExited){Close();return;}IntPtr hwnd=game.MainWindowHandle;
-          if(hwnd==IntPtr.Zero||GetForegroundWindow()!=hwnd||IsIconic(hwnd)){if(Visible)Hide();return;}
+          if(hwnd==IntPtr.Zero||GetForegroundWindow()!=hwnd||IsIconic(hwnd)){if(Visible)Hide();loot.Hide();return;}
           Rect rect;var origin=new PointNative();if(!GetClientRect(hwnd,out rect)||!ClientToScreen(hwnd,ref origin))return;
           string next=ReadBalance(),hint=ReadLootHint();
           float scale=Math.Max(.75f,Math.Min(GetDpiForWindow(hwnd)/96f,Math.Min(rect.Right/800f,rect.Bottom/600f)));bool scaleChanged=displayScale!=scale;displayScale=scale;
+          loot.Place(origin.X,origin.Y,rect.Right,rect.Bottom,scale,hint);
           var bounds=HudBounds(rect.Right,rect.Bottom,scale);
           SetWindowPos(Handle,new IntPtr(-1),origin.X+bounds.X,origin.Y+bounds.Y,bounds.Width,bounds.Height,0x0010);
           if(next!=balance||hint!=lootHint||scaleChanged){balance=next;lootHint=hint;Invalidate();}
@@ -91,8 +93,8 @@ namespace KarmaLocal {
       base.OnPaint(e);float scale=displayScale;
       e.Graphics.TextRenderingHint=System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
       using(var font=new Font("Malgun Gothic",12*scale,FontStyle.Bold,GraphicsUnit.Pixel))
-      using(var format=new StringFormat{Alignment=StringAlignment.Far,LineAlignment=StringAlignment.Center,FormatFlags=StringFormatFlags.NoWrap,Trimming=StringTrimming.EllipsisCharacter}){
-        string[] lines={"내 코인 · "+balance,lootHint};
+      using(var format=new StringFormat{Alignment=StringAlignment.Near,LineAlignment=StringAlignment.Center,FormatFlags=StringFormatFlags.NoWrap,Trimming=StringTrimming.EllipsisCharacter}){
+        string[] lines={"내 코인 · "+balance};
         for(int i=0;i<lines.Length;i++){
           var area=new RectangleF(0,22*scale*i,ClientSize.Width-2,22*scale);
           var shadow=area;shadow.Offset(1,1);
@@ -102,4 +104,31 @@ namespace KarmaLocal {
       }
     }
   }
+  public sealed class LootHintHud : Form {
+    [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
+    string hint="";float scale=1;
+    protected override bool ShowWithoutActivation{get{return true;}}
+    protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x08000000|0x00000020|0x00000080;return p;}}
+    public LootHintHud(){FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;AutoScaleMode=AutoScaleMode.None;DoubleBuffered=true;BackColor=Color.Magenta;TransparencyKey=BackColor;Location=new Point(-10000,-10000);}
+    public static Rectangle HudBounds(int width,int height,float dpi){
+      float s=Math.Max(.75f,Math.Min(dpi,Math.Min(width/800f,height/600f)));
+      int w=Math.Min((int)(360*s),(int)(width*.45)),h=(int)(24*s);
+      return new Rectangle((width-w)/2,Math.Max(0,height-(int)(62*s)),w,h);
+    }
+    public void Place(int x,int y,int width,int height,float dpi,string text){
+      if(String.IsNullOrEmpty(text)){Hide();return;}
+      bool changed=hint!=text||scale!=dpi;hint=text;scale=dpi;
+      var b=HudBounds(width,height,dpi);SetWindowPos(Handle,new IntPtr(-1),x+b.X,y+b.Y,b.Width,b.Height,0x0010);if(changed)Invalidate();if(!Visible)Show();
+    }
+    protected override void WndProc(ref Message m){if(m.Msg==0x84){m.Result=new IntPtr(-1);return;}if(m.Msg==0x21){m.Result=new IntPtr(3);return;}base.WndProc(ref m);}
+    protected override void OnPaint(PaintEventArgs e){
+      base.OnPaint(e);e.Graphics.TextRenderingHint=System.Drawing.Text.TextRenderingHint.SingleBitPerPixelGridFit;
+      using(var f=new Font("Malgun Gothic",12*scale,FontStyle.Bold,GraphicsUnit.Pixel))
+      using(var format=new StringFormat{Alignment=StringAlignment.Center,LineAlignment=StringAlignment.Center,FormatFlags=StringFormatFlags.NoWrap,Trimming=StringTrimming.EllipsisCharacter}){
+        var area=new RectangleF(0,0,ClientSize.Width-2,ClientSize.Height-2);var shadow=area;shadow.Offset(1,1);
+        e.Graphics.DrawString(hint,f,Brushes.Black,shadow,format);e.Graphics.DrawString(hint,f,Brushes.White,area,format);
+      }
+    }
+  }
+
 }

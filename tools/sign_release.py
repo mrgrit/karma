@@ -29,7 +29,7 @@ for source in sorted(root.rglob('*')):
     assert not source.is_symlink()
     rel=source.relative_to(root).as_posix()
     assert not any(x in ('..','secrets','data','__pycache__') for x in source.relative_to(root).parts)
-    assert not re.search(r'(selection|profile)\.json$|(?:^|/)(?:playstyle|lan-status|lan-start|lan-cancel|loot-hint|lan-lobby-command|lan-lobby-result)\.json$|(?:^|/)(?:lan-config-|pause-)|\.(?:log|tmp|lnk)$',rel,re.I),rel
+    assert not re.search(r'(selection|profile)\.json$|(?:^|/)(?:playstyle|lan-status|lan-start|lan-cancel|lan-return|loot-hint|lan-lobby-command|lan-lobby-result)\.json$|(?:^|/)(?:lan-config-|pause-)|\.(?:log|tmp|lnk)$',rel,re.I),rel
     digest=hashlib.sha256(source.read_bytes()).hexdigest()
     target=out/'files'/digest
     if not target.exists():shutil.copyfile(source,target)

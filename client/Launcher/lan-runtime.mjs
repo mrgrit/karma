@@ -1,3 +1,4 @@
+import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -34,7 +35,7 @@ for(const file of [lobbyCommandPath,lobbyResultPath])try{fs.unlinkSync(file);}ca
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
 const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
 let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,connected=false,
-  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud,accountProfile={},matchResult=null,resultFiles=[];
+  failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud,accountProfile={},matchResult=null,resultFiles=[],returnLobby=null,returnRequested=false;
 const checkClosing=()=>{if(closing)throw Error('LAN 대전이 취소되었습니다.');};
 saveChat();
 saveFeed();
@@ -78,7 +79,7 @@ const keepAlive=setInterval(()=>{
       if(!/^[a-f0-9]{32}$/i.test(command.requestId||''))throw Error('잘못된 대기실 요청입니다.');
       const update={requestId:command.requestId};
       if(typeof command.ready==='boolean')update.ready=command.ready;
-      if(command.config)update.config={...command.config,character:characterConfig(command.config.character),settings:{build:'karma290-central5',mode:1}};
+      if(command.config)update.config={...command.config,character:characterConfig(command.config.character),settings:{build:'karma290-central6',mode:1}};
       if(connected||command.roomId!==peer?.match?.roomId||!peer.updateLobby?.(update))throw Error('이미 대전이 시작됐거나 대기실 연결이 종료되었습니다.');
     }catch(error){
       fs.writeFileSync(lobbyResultPath,JSON.stringify({requestId:command?.requestId,ok:false,message:error.message}));
@@ -113,7 +114,7 @@ const openResults=()=>{
   const key=pid+'-'+Date.now(),commandFile=path.join(support,'pause-result-command-'+key+'.json');
   const dataFile=path.join(support,'pause-result-data-'+key+'.json');
   resultFiles=[commandFile,dataFile];
-  fs.writeFileSync(dataFile,JSON.stringify({result:matchResult,localPlayerId:peer.playerId}));
+  fs.writeFileSync(dataFile,JSON.stringify({result:matchResult,localPlayerId:peer.playerId,canReturn:!!returnLobby}));
   const child=spawnHelper(path.join(root,'KarmaLauncher.exe'),['--results',commandFile,dataFile,String(pid)],{cwd:root,stdio:'ignore',windowsHide:false});
   pauseChild=child;let childExited=false;
   child.on('exit',()=>{childExited=true;});
@@ -122,7 +123,8 @@ const openResults=()=>{
   log('results-opened',{matchId:matchResult.id});
   pauseTimer=setInterval(()=>{
     let action;try{action=readJson(commandFile).action;}catch{}
-    if(action==='quit'){cleanMenu();stop('대전 결과를 확인하고 퇴장했습니다.');}
+    if(action==='lobby'&&returnLobby){returnRequested=true;cleanMenu();stop('같은 방의 대기실로 돌아갑니다.');}
+    else if(action==='quit'){cleanMenu();stop('대전 결과를 확인하고 퇴장했습니다.');}
     else if(childExited){cleanMenu();stop('결과 창이 닫혀 대전을 종료했습니다.');}
   },100);
 };
@@ -149,7 +151,7 @@ try{
   const central=options.transport==='central';
   let config={map:central?(options.config?.map??0):0,age:0,character:localCharacter,
     ...(central?{inventory:options.config.inventory,selectedWeapon:options.config.selectedWeapon}:{}),
-    settings:{build:central?'karma290-central5':'karma290-lan1',mode:1}};
+    settings:{build:central?'karma290-central6':'karma290-lan1',mode:1}};
   if(!multiplayerMaps.some(map=>map.mapIndex===config.map))throw Error('멀티플레이 지원 전장을 선택하세요.');
   status('connecting',options.role==='host'?'방을 준비하고 있습니다.':'방에 접속하고 있습니다.');
   peer=await (central?createCentralPeer:createLanPeer)({
@@ -178,7 +180,7 @@ try{
       if(phase==='round-ended')status('playing','라운드 '+detail.round+' 종료 · '+detail.roundWins.join(' : ')+' · 다음 라운드 준비');
       if(phase==='round-start')status('playing','라운드 '+detail.round+' · 한 팀 전멸 시 종료 · F10 메뉴');
       if(phase==='match-ended'){
-        finishMatch(detail.result||{});
+        returnLobby=detail.returnLobby||null;finishMatch(detail.result||{});
       }
       if(phase==='disconnected'&&connected&&!closing&&!matchResult)stop('상대와의 연결이 끊겨 대전을 종료했습니다.',true);
     },
@@ -233,7 +235,9 @@ try{
   const lanConfig={equipmentCatalog,role:options.role,localCharacter,remoteCharacter,local:config,remote:remoteHello.config,remoteHello,
     central,localPlayerId:peer.playerId,remotePlayerId:peer.remotePlayerId,
     peers:central?peer.peers:undefined,slot:peer.slot,team:peer.team,match:peer.match};
-  let source='globalThis.KARMA_LAN_CONFIG='+JSON.stringify(lanConfig)+';\n';
+  let inputSettings={};
+  try{inputSettings=JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA||os.homedir(),'KarmaLAN','input-settings.json'),'utf8').replace(/^\uFEFF/,''));}catch{}
+  let source='globalThis.KARMA_INPUT_SETTINGS='+JSON.stringify(inputSettings)+';\n'+'globalThis.KARMA_LAN_CONFIG='+JSON.stringify(lanConfig)+';\n';
   for(const file of ['startup-diagnostics.js','legacy-controls.js','input-lan.js','native-font.js','offline-death.js','window-size.js','lan-game.js','rank-display.js','player-names.js'])
     source+='\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
   source+='\nrpc.exports.compatibilitystatus=()=>({ready:true});';
@@ -284,4 +288,8 @@ try{
   try{fs.unlinkSync(settingsPath);}catch{}
   try{fs.unlinkSync(chatStatePath);}catch{}
   try{fs.unlinkSync(feedPath);}catch{}
+  if(returnRequested&&returnLobby&&!failureReason){
+    const next={...options,role:'join',code:returnLobby.code,roomId:returnLobby.roomId,config:{...options.config,map:returnLobby.map}};
+    fs.writeFileSync(path.join(support,'lan-return.json'),JSON.stringify(next));
+  }
 }

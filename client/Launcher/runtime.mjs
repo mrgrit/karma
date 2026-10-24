@@ -1,3 +1,4 @@
+import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import {spawn as spawnHelper} from 'node:child_process';
@@ -45,7 +46,9 @@ try {
   const moduleSource=file=>'\n(()=>{\n'+fs.readFileSync(path.join(support,file),'utf8')+'\n})();\n';
   let accountProfile={};
   try{accountProfile=JSON.parse(fs.readFileSync(path.join(support,'central-profile.json'),'utf8').replace(/^\uFEFF/,''));}catch{}
-  let source='globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\nglobalThis.KARMA_ACCOUNT_PROFILE='+JSON.stringify({rank:accountProfile.rank,name:accountProfile.name})+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('legacy-controls.js')+moduleSource('input-menu.js')+moduleSource('native-font.js');
+  let inputSettings={};
+  try{inputSettings=JSON.parse(fs.readFileSync(path.join(process.env.LOCALAPPDATA||os.homedir(),'KarmaLAN','input-settings.json'),'utf8').replace(/^\uFEFF/,''));}catch{}
+  let source='globalThis.KARMA_INPUT_SETTINGS='+JSON.stringify(inputSettings)+';\n'+'globalThis.KARMA_PLAYSTYLE='+JSON.stringify(profile)+';\nglobalThis.KARMA_ACCOUNT_PROFILE='+JSON.stringify({rank:accountProfile.rank,name:accountProfile.name})+';\n'+moduleSource('startup-diagnostics.js')+moduleSource('legacy-controls.js')+moduleSource('input-menu.js')+moduleSource('native-font.js');
   source+=moduleSource('offline-death.js');
   source+=moduleSource('practice-end.js');
   source+=moduleSource('window-size.js');

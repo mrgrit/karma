@@ -13,6 +13,7 @@ if ($GameRoot) {
     if (!(Test-Path -LiteralPath (Join-Path $target 'App_Executables\Karma.exe'))) { throw 'GameRoot must be an extracted Karma release' }
     Copy-Item -LiteralPath (Join-Path $client 'KarmaLauncher.exe') -Destination $target
     Copy-Item -LiteralPath (Join-Path $client 'KarmaUpdater.exe') -Destination $target
+    Copy-Item -LiteralPath (Join-Path $client 'GameData\fsd.kst') -Destination (Join-Path $target 'App_Executables\Data\World\fsd.kst')
     Get-ChildItem -LiteralPath $source -File | Copy-Item -Destination (Join-Path $target 'Launcher')
 }
 Write-Host 'KarmaLauncher build complete.'

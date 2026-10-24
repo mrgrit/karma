@@ -66,8 +66,8 @@ namespace KarmaLocal {
       }
       layout.Controls.Add(grid,0,2);
       layout.Controls.Add(new Label{Text="Point = 이번 경기 획득 경험치 (확정 킬 25 · 사망 5)\n전적은 서버에 저장됐습니다. 결과를 확인한 뒤 퇴장을 눌러 주세요.",AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,16,0,14)},0,3);
-      var leave=new Button{Name="Leave",Text="퇴장",Dock=DockStyle.Right,Width=180,BackColor=Color.FromArgb(222,181,100),ForeColor=Color.Black};layout.Controls.Add(leave,0,4);
-      leave.Click+=(s,e)=>{File.WriteAllText(commandPath,"{\"action\":\"quit\"}",Encoding.UTF8);leaving=true;Close();};
+      var leave=new Button{Name="Leave",Text=TextValue(data,"canReturn")=="True"?"대기실로 돌아가기":"퇴장",Dock=DockStyle.Right,Width=180,BackColor=Color.FromArgb(222,181,100),ForeColor=Color.Black};layout.Controls.Add(leave,0,4);
+      leave.Click+=(s,e)=>{File.WriteAllText(commandPath,TextValue(data,"canReturn")=="True"?"{\"action\":\"lobby\"}":"{\"action\":\"quit\"}",Encoding.UTF8);leaving=true;Close();};
       // Esc, F10, Enter and accidental window-close must not discard results.
       FormClosing+=(s,e)=>{if(!leaving&&e.CloseReason==CloseReason.UserClosing)e.Cancel=true;};
       Shown+=(s,e)=>{var area=Screen.FromControl(this).WorkingArea;Size=new Size(Math.Min(Width,area.Width-24),Math.Min(Height,area.Height-24));Location=new Point(area.Left+(area.Width-Width)/2,area.Top+(area.Height-Height)/2);Activate();grid.Focus();};

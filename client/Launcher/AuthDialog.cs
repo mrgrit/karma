@@ -267,13 +267,20 @@ namespace KarmaLocal {
     public void ShowAccount(Dictionary<string,object> profile) {
       accountMode=true;Text="카르마 · 계정";
       foreach(Control c in Controls.Cast<Control>().ToArray()){Controls.Remove(c);c.Dispose();}
-      ClientSize=new Size(520,330);
+      ClientSize=new Size(520,420);
       var panel=new Panel{Dock=DockStyle.Fill,AutoScroll=true};Controls.Add(panel);
       var grid=FormGrid(panel);
       grid.Controls.Add(TextLabel(Value(profile,"name",Value(profile,"displayName","카르마 계정")),true));
       grid.Controls.Add(TextLabel(Value(profile,"email")));
       grid.Controls.Add(TextLabel("서버 "+host+":"+port+"\nXP "+Number(profile,"xp",0).ToString("N0")));
+      var nameInput=new TextBox{Name="GameName",Text=Value(profile,"name"),MaxLength=32,Dock=DockStyle.Top};
+      grid.Controls.Add(TextLabel("게임 이름 (1~32자)"));grid.Controls.Add(nameInput);
+      var rename=MakeButton("이름 저장");grid.Controls.Add(rename);
       status=TextLabel("");grid.Controls.Add(status);
+      rename.Click+=async(s,e)=>{if(busy)return;await Perform(async()=>{
+        var response=await Send(new Dictionary<string,object>{{"operation","rename"},{"displayName",nameInput.Text}});
+        RequireSuccess(response);Authenticated=true;DialogResult=DialogResult.OK;Close();
+      },"게임 이름을 저장하고 있습니다…");};
       var buttons=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};
       var close=MakeButton("닫기");close.DialogResult=DialogResult.Cancel;
       action=MakeButton("로그아웃");buttons.Controls.Add(close);buttons.Controls.Add(action);grid.Controls.Add(buttons);

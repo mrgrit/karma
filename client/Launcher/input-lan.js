@@ -269,7 +269,7 @@ function resumePause(source) {
   resetHotkeyPolling();
   escapeDown = escapeDown || (getKey(0x1b) & 0x8000) !== 0;
   f10Down = f10Down || (getKey(0x79) & 0x8000) !== 0;
-  chatAllDown = chatAllDown || (getKey(0x54) & 0x8000) !== 0;
+  chatAllDown = chatAllDown || ((getKey(0x54) | getKey(0x0d)) & 0x8000) !== 0;
   chatTeamDown = chatTeamDown || (getKey(0x59) & 0x8000) !== 0;
   clearInputBuffers(getInput());
   restoreInput();
@@ -376,7 +376,7 @@ function serviceFrame() {
     return;
   }
   hotkeys('async-key', (getKey(0x1b) & 0x8000) !== 0, (getKey(0x79) & 0x8000) !== 0,
-    (getKey(0x54) & 0x8000) !== 0, (getKey(0x59) & 0x8000) !== 0);
+    ((getKey(0x54) | getKey(0x0d)) & 0x8000) !== 0, (getKey(0x59) & 0x8000) !== 0);
   if (exitRequested || paused) return;
   if (!lastForeground) {
     if (cursorReleased) restoreInput();
@@ -395,7 +395,7 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
     const param = args[2].toInt32();
     const keyDown = this.message === 0x100 || this.message === 0x104;
     const keyUp = this.message === 0x101 || this.message === 0x105;
-    if ((keyDown || keyUp) && [0x1b, 0x79, 0x54, 0x59].includes(param)) {
+    if ((keyDown || keyUp) && [0x1b, 0x79, 0x54, 0x59, 0x0d].includes(param)) {
       const hwnd = ptr('0x548d50').readPointer();
       if (!hwnd.isNull() && args[0].equals(hwnd)) {
         // Consume both edges before the original online/menu handler sees
@@ -404,7 +404,7 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
         if (keyUp) {
           if (param === 0x1b) escapeDown = false;
           else if (param === 0x79) f10Down = false;
-          else if (param === 0x54) chatAllDown = false;
+          else if ((param === 0x54 || param === 0x0d)) chatAllDown = false;
           else chatTeamDown = false;
         } else if (!exitRequested && foreground().equals(hwnd)) {
           const repeat = (args[3].toUInt32() & 0x40000000) !== 0;
@@ -413,12 +413,12 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
             // new edge. Only a release can rearm the key.
             if (param === 0x1b) escapeDown = true;
             else if (param === 0x79) f10Down = true;
-            else if (param === 0x54) chatAllDown = true;
+            else if ((param === 0x54 || param === 0x0d)) chatAllDown = true;
             else chatTeamDown = true;
           } else {
             hotkeys('window-key', param === 0x1b ? true : undefined,
               param === 0x79 ? true : undefined,
-              param === 0x54 ? true : undefined, param === 0x59 ? true : undefined);
+              (param === 0x54 || param === 0x0d) ? true : undefined, param === 0x59 ? true : undefined);
           }
         }
       }
@@ -429,7 +429,7 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
     // discarded while local input is released.
     const character = [0x102, 0x103, 0x106, 0x107].includes(this.message);
     if ((keyDown || keyUp || character) && args[0].equals(ptr('0x548d50').readPointer()) &&
-        (paused || matchFinished || character && [0x54, 0x74, 0x59, 0x79].includes(param))) args[1] = ptr(0);
+        (paused || matchFinished || character && [0x54, 0x74, 0x59, 0x79, 0x0d].includes(param))) args[1] = ptr(0);
     if (this.message === MENU_MESSAGE) drainCommands();
     const inactive = (this.message === 0x06 && (param & 0xffff) === 0) ||
       (this.message === 0x1c && param === 0);
@@ -516,28 +516,43 @@ retained.keyboardCallback = new NativeCallback(function (input) {
   const chatAll = input.add(0x40 + 0x14), chatTeam = input.add(0x40 + 0x15);
   const escapeHeld = (escape.readU8() & 0x80) !== 0;
   const f10Held = (f10.readU8() & 0x80) !== 0;
-  const chatAllHeld = (chatAll.readU8() & 0x80) !== 0;
+  const chatAllHeld = ((chatAll.readU8() | input.add(0x40 + 0x1c).readU8()) & 0x80) !== 0;
   const chatTeamHeld = (chatTeam.readU8() & 0x80) !== 0;
   escape.writeU8(0);
   f10.writeU8(0);
-  chatAll.writeU8(0);
+  chatAll.writeU8(0);input.add(0x40 + 0x1c).writeU8(0);
   chatTeam.writeU8(0);
   const hwnd = ptr('0x548d50').readPointer();
   if (!hwnd.isNull() && foreground().equals(hwnd)) {
     hotkeys('directinput', escapeHeld || (getKey(0x1b) & 0x8000) !== 0,
       f10Held || (getKey(0x79) & 0x8000) !== 0,
-      chatAllHeld || (getKey(0x54) & 0x8000) !== 0,
+      chatAllHeld || ((getKey(0x54) | getKey(0x0d)) & 0x8000) !== 0,
       chatTeamHeld || (getKey(0x59) & 0x8000) !== 0);
   }
   if (inputUnavailable()) clearInputBuffers(input);
   return result;
 }, 'int', ['pointer'], 'thiscall');
+let mouseRemote=false;
+try{mouseRemote=api('GetSystemMetrics','int',['int'])(0x1000)!==0;}catch{}
+const mouseOptions=globalThis.KARMA_INPUT_SETTINGS||{};
+const remoteInput=typeof mouseOptions.remoteMode==='boolean'?mouseOptions.remoteMode:mouseRemote;
+const mouseScale=Number.isFinite(mouseOptions.sensitivity)?Math.max(.05,Math.min(2,mouseOptions.sensitivity)):(remoteInput?.25:1);
+let mouseReset=true,mouseRemainder=[0,0];
 retained.mouseCallback = new NativeCallback(function (input) {
   if (inputUnavailable()) {
+    mouseReset=true;mouseRemainder=[0,0];
     if (!input.isNull()) input.add(0x4e0).writeByteArray(zeroMouse);
     return 0;
   }
-  return nativeMousePoll(input);
+  const result=nativeMousePoll(input);
+  if(result<0||input.isNull())return result;
+  for(let axis=0;axis<2;axis++){
+    const field=input.add(0x4e0+axis*4),raw=field.readS32();
+    if(mouseReset||remoteInput&&Math.abs(raw)>500){field.writeS32(0);mouseRemainder[axis]=0;continue;}
+    const scaled=raw*mouseScale+mouseRemainder[axis],whole=Math.trunc(scaled);
+    field.writeS32(whole);mouseRemainder[axis]=scaled-whole;
+  }
+  mouseReset=false;return result;
 }, 'int', ['pointer'], 'thiscall');
 Interceptor.replace(keyboardPollAddress, retained.keyboardCallback);
 Interceptor.replace(mousePollAddress, retained.mouseCallback);

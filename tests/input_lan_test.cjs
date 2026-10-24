@@ -133,7 +133,7 @@ for(const origin of ['escape','rpc','native']) {
 assert.throws(()=>harness('gate'),/Unsupported game dispatcher call/);
 console.log('PASS: LAN native frame/clock continuity, independent input pause flag, no world-pause callback, zero polling without reacquire, focus-loss release/foreground recovery, stable cursor counts, short F10/Escape handling and permanent exit release.');
 
-for(const mode of ['duel','dm','tdm'])for(const [vk,scan,channel] of [[0x54,0x14,'all'],[0x59,0x15,'team']])for(const source of ['window','async','directinput']){
+for(const mode of ['duel','dm','tdm'])for(const [vk,scan,channel] of [[0x54,0x14,'all'],[0x0d,0x1c,'all'],[0x59,0x15,'team']])for(const source of ['window','async','directinput']){
   const h=harness();h.context.KARMA_LAN_CONFIG={match:{mode}};h.frame();h.keyboard();
   if(source==='window')h.windowMessage(0x100,vk);
   else if(source==='async'){h.s.held.add(vk);h.frame();}
@@ -182,3 +182,13 @@ for(const mode of ['duel','dm','tdm'])for(const [vk,scan,channel] of [[0x54,0x14
   assert.equal(h.retained.flagPage.readU8(),1);assert.equal(h.clock(),clock);assert.equal(h.s.cursor,0);
 }
 console.log('PASS: T all/Y team chat routing across WM/async/DI, disabled Y absorption, isolated typing, continuing world clock, foreground-safe resume, duplicate requests and terminal results.');
+
+{
+ const h=harness('',{remoteMode:true,sensitivity:.25});h.frame();
+ h.p(0x54e0).writeS32(800);h.mouse();assert.equal(h.p(0x54e0).readS32(),0,'first reacquire delta discarded');
+ h.p(0x54e0).writeS32(100);h.p(0x54e4).writeS32(-100);h.mouse();
+ assert.equal(h.p(0x54e0).readS32(),25);assert.equal(h.p(0x54e4).readS32(),-25);
+ h.p(0x54e0).writeS32(5000);h.mouse();assert.equal(h.p(0x54e0).readS32(),0,'remote absolute-position spike discarded');
+ let sum=0;for(let i=0;i<4;i++){h.p(0x54e0).writeS32(1);h.mouse();sum+=h.p(0x54e0).readS32();}assert.equal(sum,1,'subpixel input preserved');
+}
+console.log('PASS remote mouse: per-PC scaling, focus reacquire, outlier rejection and fractional input preservation');

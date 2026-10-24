@@ -9,9 +9,24 @@ class MasteryHudTests {
    Check(b.Left>=0&&b.Right<=width&&b.Top>=0&&b.Bottom<=height,"inside game viewport");
    Check(b.Height<=height*.08&&b.Width<=width*.46,"small peripheral footprint at any DPI");
    Check(!b.Contains(width/2,height/2),"never covers crosshair");
+   var loot=LootHintHud.HudBounds(width,height,dpi);
+   Check(loot.Left>=width*.25&&loot.Right<=width*.75,"loot avoids native weapon and inventory at right");
+   Check(loot.Top>=height*.85&&loot.Bottom<height,"loot is beneath chat and away from crosshair");
+   Check(!loot.IntersectsWith(b),"coin and pickup surfaces are separate");
   }
+  string chatDir=Path.Combine(Path.GetTempPath(),"karma-chat-ui-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(chatDir);
+  try {using(var panel=new ChatPanel(chatDir)){
+    bool sent=false;panel.Sent+=()=>sent=true;
+    var input=(TextBox)panel.Controls.Find("ChatInput",true)[0];input.Text="전달 확인 테스트";
+    typeof(ChatPanel).GetMethod("Send",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(panel,null);
+    Check(!sent&&input.Text!="","must not close or clear draft before server echo");
+    var serializer=new System.Web.Script.Serialization.JavaScriptSerializer();
+    string request=Directory.GetFiles(chatDir,"pause-chat-send-*.json")[0];var data=serializer.Deserialize<Dictionary<string,object>>(File.ReadAllText(request));
+    File.WriteAllText(Path.Combine(chatDir,"pause-chat-state.json"),serializer.Serialize(new {mode="duel",messages=new object[]{new {id="server-id",requestId=data["requestId"],text="전달 확인 테스트",name="학생",channel="all"}}}));
+    panel.RefreshMessages();Check(sent&&input.Text=="","server echo acknowledges delivery");
+  }}finally{foreach(string file in Directory.GetFiles(chatDir))File.Delete(file);Directory.Delete(chatDir);}
   var feed=new Dictionary<string,object>{{"kind","kill"},{"killerName","학생A"},{"victimName","학생B"},{"weaponName","Kar.98k"},{"techniqueName","링크 스피어피싱"}};
-  Check(KillFeedHud.Line(feed).Contains("Kar.98k · 링크 스피어피싱"),"specific technique label");
+  Check(KillFeedHud.Line(feed).Contains("Kar.98k로 링크 스피어피싱 공격을 했습니다."),"specific technique label");
   if(args.Length>1){
    string root=args[1],support=Path.Combine(root,"Launcher");
    var heavy=new CatalogItem{Data=new Dictionary<string,object>{{"id","cpom_020"},{"age",0},{"name","중화기"}}};

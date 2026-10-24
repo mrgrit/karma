@@ -2,7 +2,7 @@ const fs = require('fs'), vm = require('vm'), assert = require('assert');
 const source = fs.readFileSync(process.argv[2] || 'client/Launcher/input-menu.js', 'utf8');
 assert(!source.includes('MessageBox'), 'no game-thread modal UI');
 assert(!/new NativeFunction\(.*41a660/.test(source), 'no JS invocation of full dispatcher');
-function harness(bad = '') {
+function harness(bad = '', inputSettings = {}) {
   const data = new Map(), bytes = new Map(), hooks = new Map(), replacements = new Map();
   const events = [], calls = [], callbacks = [];
   const s = {cursor: -2, fg: 0x3000, held: new Set(), quits: 0, rawTick: 1000,
@@ -21,6 +21,8 @@ function harness(bad = '') {
     writeU8(n) { bytes.set(this.n,n); }
     readU32() { return Buffer.from(new Uint8Array(this.readByteArray(4))).readUInt32LE(); }
     writeU32(n) { const b=Buffer.alloc(4);b.writeUInt32LE(n>>>0);this.writeByteArray(b); }
+    readS32() { return this.readU32()|0; }
+    writeS32(n) { this.writeU32(n); }
     readByteArray(n) { return Uint8Array.from({length:n}, (_,i)=>this.add(i).readU8()).buffer; }
     writeByteArray(a) { a.forEach((v,i)=>bytes.set(this.n+i,v)); }
     replace(n) { this.n = n; }
@@ -85,6 +87,7 @@ function harness(bad = '') {
   };
   let nextAlloc = 0x10000000;
   const context = {
+    KARMA_INPUT_SETTINGS:inputSettings,
     Process:{
       id:12345,pageSize:4096,pointerSize:4,
       findRangeByAddress:()=>({protection:'r--'}),

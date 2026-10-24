@@ -53,7 +53,7 @@ if(roster.length<1||roster.length>7)throw Error('Expected 1 to 7 peers');
 const peers=roster.map((peer,i)=>({...peer,index:i+1,id:peer.playerId||cfg.remotePlayerId||'remote',
  team:peer.team??1,r:null,life:0,seq:-1,dead:false,paused:false,left:false,latest:null,shots:new Set(),hits:new Set()}));
 const selfId=cfg.localPlayerId||'local',selfTeam=cfg.team??0,teamMode=cfg.match?.mode==='tdm';
-const authoritative=cfg.central===true&&['karma290-central3','karma290-central4','karma290-central5'].includes(cfg.local?.settings?.build);
+const authoritative=cfg.central===true&&['karma290-central3','karma290-central4','karma290-central5','karma290-central6'].includes(cfg.local?.settings?.build);
 function peerById(id){return id?peers.find(p=>p.id===id):peers.length===1?peers[0]:null;}
 function peerByIndex(index){return peers.find(p=>p.index===index);}
 function nativeIndex(id){return id===selfId?0:peerById(id)?.index??-1;}

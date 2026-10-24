@@ -481,12 +481,27 @@ retained.keyboardCallback = new NativeCallback(function (input) {
   if (exitRequested || paused) clearInputBuffers(input);
   return result;
 }, 'int', ['pointer'], 'thiscall');
+let mouseRemote=false;
+try{mouseRemote=api('GetSystemMetrics','int',['int'])(0x1000)!==0;}catch{}
+const mouseOptions=globalThis.KARMA_INPUT_SETTINGS||{};
+const remoteInput=typeof mouseOptions.remoteMode==='boolean'?mouseOptions.remoteMode:mouseRemote;
+const mouseScale=Number.isFinite(mouseOptions.sensitivity)?Math.max(.05,Math.min(2,mouseOptions.sensitivity)):(remoteInput?.25:1);
+let mouseReset=true,mouseRemainder=[0,0];
 retained.mouseCallback = new NativeCallback(function (input) {
   if (exitRequested || paused) {
+    mouseReset=true;mouseRemainder=[0,0];
     if (!input.isNull()) input.add(0x4e0).writeByteArray(zeroMouse);
     return 0;
   }
-  return nativeMousePoll(input);
+  const result=nativeMousePoll(input);
+  if(result<0||input.isNull())return result;
+  for(let axis=0;axis<2;axis++){
+    const field=input.add(0x4e0+axis*4),raw=field.readS32();
+    if(mouseReset||remoteInput&&Math.abs(raw)>500){field.writeS32(0);mouseRemainder[axis]=0;continue;}
+    const scaled=raw*mouseScale+mouseRemainder[axis],whole=Math.trunc(scaled);
+    field.writeS32(whole);mouseRemainder[axis]=scaled-whole;
+  }
+  mouseReset=false;return result;
 }, 'int', ['pointer'], 'thiscall');
 Interceptor.replace(keyboardPollAddress, retained.keyboardCallback);
 Interceptor.replace(mousePollAddress, retained.mouseCallback);

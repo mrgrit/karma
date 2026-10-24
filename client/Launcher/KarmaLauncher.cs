@@ -75,7 +75,7 @@ namespace KarmaLocal {
     public string MatchMode="duel";
     public string AddressDisplay {get{return address.Text;}}
     readonly TextBox address,code,roomName;
-    public LanSetup(bool host,string support) {
+    public LanSetup(bool host,string support,int maxSeats=8) {
       Text=host?"중앙 서버 · 방 만들기":"중앙 서버 · 참가";ClientSize=new Size(560,800);
       AutoScaleDimensions=new SizeF(96F,96F);AutoScaleMode=AutoScaleMode.Dpi;Font=new Font("Malgun Gothic",10);
       FormBorderStyle=FormBorderStyle.Sizable;StartPosition=FormStartPosition.CenterParent;
@@ -105,9 +105,9 @@ namespace KarmaLocal {
         MaxLength=6,Width=190,Margin=new Padding(0,0,0,16)};
       panel.Controls.Add(code);
       var matchMode=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Dock=DockStyle.Top,Margin=new Padding(0,0,0,12)};
-      matchMode.Items.AddRange(new object[]{"1:1 대전 (2명)","팀전 (최대 4:4 · 전멸전)","개인 데스매치 (2~8명)"});matchMode.SelectedIndex=0;
+      matchMode.Items.AddRange(new object[]{"1:1 대전 (2명)","팀전 (최대 "+(maxSeats/2)+":"+(maxSeats/2)+" · 전멸전)","개인 데스매치 (2~"+maxSeats+"명)"});matchMode.SelectedIndex=0;
       var capacity=new ComboBox{DropDownStyle=ComboBoxStyle.DropDownList,Width=180,Margin=new Padding(0,0,0,16)};
-      capacity.Items.AddRange(new object[]{2,3,4,5,6,7,8});capacity.SelectedIndex=6;capacity.Enabled=false;
+      for(int seat=2;seat<=maxSeats;seat++)capacity.Items.Add(seat);capacity.SelectedIndex=capacity.Items.Count-1;capacity.Enabled=false;
       if(host){
         panel.Controls.Add(new Label{Text="대전 방식",AutoSize=true});panel.Controls.Add(matchMode);
         panel.Controls.Add(new Label{Text="개인전 최대 인원",AutoSize=true});panel.Controls.Add(capacity);
@@ -136,7 +136,7 @@ namespace KarmaLocal {
         if(host&&(String.IsNullOrWhiteSpace(roomName.Text)||roomName.Text.Any(Char.IsControl))){MessageBox.Show(this,"방 이름을 입력해 주세요.");return;}
         Host=ip.ToString();Code=code.Text;RoomName=roomName.Text.Trim();
         MatchMode=matchMode.SelectedIndex==1?"tdm":matchMode.SelectedIndex==2?"dm":"duel";
-        MaxPlayers=MatchMode=="tdm"?8:MatchMode=="dm"?Convert.ToInt32(capacity.SelectedItem):2;
+        MaxPlayers=MatchMode=="tdm"?maxSeats:MatchMode=="dm"?Convert.ToInt32(capacity.SelectedItem):2;
         KillLimit=(int)killLimit.Value;RoundWinLimit=(int)roundLimit.Value;TimeLimitSeconds=(int)timeLimit.Value*60;
         try{File.WriteAllText(serverPath,serializer.Serialize(new Dictionary<string,object>{{"host",Host},{"port",Port}}),Encoding.UTF8);}
         catch(Exception ex){MessageBox.Show(this,"서버 주소를 저장할 수 없습니다.\n"+ex.Message);return;}
@@ -335,7 +335,7 @@ namespace KarmaLocal {
       Panel header=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty,BackColor=Color.FromArgb(21,29,35)};
       frame.Controls.Add(header,0,0); LabelAt(header,"K A R M A",28,12,250,40,23,ink,true);
       LabelAt(header,"LOCAL  /  290",281,26,180,26,10,accent,true);
-      LabelAt(header,"전장을 고르고, 바로 시작하세요.",30,55,500,24,10,muted);
+      LabelAt(header,"전장을 고르고, 바로 시작하세요.",30,55,400,24,10,muted);
       accountButton=ButtonAt(header,"로그인 / 계정",0,22,190,38);accountButton.AutoEllipsis=true;
       accountButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;
       refreshStats=ButtonAt(header,"전적 새로고침",0,22,140,38);refreshStats.Anchor=AnchorStyles.Top|AnchorStyles.Right;
@@ -348,6 +348,8 @@ namespace KarmaLocal {
       refreshStats.Left=accountButton.Left-refreshStats.Width-12;
       musicButton=ButtonAt(header,"접속 음악 · 1회",refreshStats.Left,63,140,22);musicButton.Font=new Font("Malgun Gothic",8);musicButton.Enabled=false;
       musicButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;header.Resize+=(s,e)=>musicButton.Left=refreshStats.Left;
+      var inputButton=ButtonAt(header,"마우스 · 화면",470,63,130,22);inputButton.Font=new Font("Malgun Gothic",8);
+      inputButton.Click+=(s,e)=>InputSettings();
       musicButton.Click+=(s,e)=>{menuMusic.Stop();UpdateMusic(false);};
       accountButton.Click+=async(s,e)=>await ManageAccount();
       refreshStats.Click+=async(s,e)=>await SyncMyStats();
@@ -454,7 +456,15 @@ namespace KarmaLocal {
       object entries;if(item==null||multiplayerMaps==null||!multiplayerMaps.TryGetValue("maps",out entries)||!(entries is IEnumerable))return null;
       foreach(var entry in (IEnumerable)entries){var data=entry as Dictionary<string,object>;object id;if(data!=null&&data.TryGetValue("id",out id)&&Convert.ToString(id)==item.Id)return data;}return null;
     }
-    bool PublicMap(CatalogItem item){var data=MultiplayerMap(item);object ready;return data!=null&&data.TryGetValue("publicReady",out ready)&&ready is bool&&(bool)ready;}
+    bool PublicMap(CatalogItem item){
+      object entries;
+      if(item!=null&&cachedProfile!=null&&cachedProfile.TryGetValue("maps",out entries)&&entries is IEnumerable){
+        foreach(var entry in (IEnumerable)entries){var m=entry as Dictionary<string,object>;object id,open;
+          if(m!=null&&m.TryGetValue("id",out id)&&Convert.ToString(id)==item.Id&&m.TryGetValue("open",out open)&&open is bool)return (bool)open;}
+      }
+      return LocalPublicMap(item);
+    }
+    bool LocalPublicMap(CatalogItem item){var data=MultiplayerMap(item);object ready;return data!=null&&data.TryGetValue("publicReady",out ready)&&ready is bool&&(bool)ready;}
     Dictionary<string,object> CharacterDefinition(CatalogItem item){return item==null?null:JsonDict(JsonDict(loadoutData,"characters"),item.Id);}
     bool CharacterUnlocked(CatalogItem item){return item!=null&&(item.Age!=0?IsAdmin:CharacterDefinition(item)!=null&&profileRankXp>=JsonNumber(CharacterDefinition(item),"unlockXp",0));}
     string CharacterRole(CatalogItem item){var data=CharacterDefinition(item);object value;return data!=null&&data.TryGetValue("roleName",out value)?Convert.ToString(value):CampName(item);}
@@ -465,6 +475,7 @@ namespace KarmaLocal {
     }
     int MapIndex(CatalogItem item) {
       if(item==null)return -1;
+      if(LanMode){var definition=MultiplayerMap(item);return age==0&&definition!=null&&(IsAdmin||PublicMap(item))?JsonNumber(definition,"mapIndex",-1):-1;}
       var d=item.Dict("launchIndices");object v;
       int index=-1;
       if(d!=null&&d.TryGetValue(age+":"+GameMode,out v))index=Convert.ToInt32(v);
@@ -578,6 +589,19 @@ namespace KarmaLocal {
           sessionError="게임 실행 도구가 종료되었습니다. Launcher\\last-session.log에서 오류 기록을 확인해 주세요.";
       }catch{}
       if(sessionHelper!=null){sessionHelper.Dispose();sessionHelper=null;}
+      if(!closingLauncher&&sessionError==""&&File.Exists(Path.Combine(support,"lan-return.json"))){
+        try {
+          var next=ReadSupportJson("lan-return.json");File.Delete(Path.Combine(support,"lan-return.json"));
+          if(next==null)throw new InvalidDataException("대기실 복귀 정보를 읽지 못했습니다.");
+          string nextPath=Path.Combine(support,"lan-config-"+Guid.NewGuid().ToString("N")+".json");
+          lobbyConfig=JsonDict(next,"config");File.WriteAllText(nextPath,json.Serialize(next),Encoding.UTF8);
+          sessionStartedUtc=DateTime.UtcNow;sessionError="";
+          sessionHelper=Process.Start(new ProcessStartInfo{FileName=NodePath(),Arguments="\""+Path.Combine(support,"lan-runtime.mjs")+"\" \""+nextPath+"\"",WorkingDirectory=game,UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});
+          if(sessionHelper==null)throw new InvalidOperationException("대기실에 연결하지 못했습니다.");
+          lobbyLeaving=false;sessionActive=true;sessionObservedGame=false;sessionLan=true;
+          Show();if(WindowState==FormWindowState.Minimized)WindowState=restoreState;UpdateRunning();return;
+        }catch(Exception ex){sessionError=ex.Message;}
+      }
       RefreshCentralProfile();UpdateRankInfo();
       if(WindowState==FormWindowState.Minimized)WindowState=restoreState;
       Show();Activate();
@@ -727,7 +751,7 @@ namespace KarmaLocal {
       object name;
       accountButton.Text=cachedProfile!=null&&cachedProfile.TryGetValue("email",out name)&&
         !String.IsNullOrEmpty(Convert.ToString(name))?
-        "계정: "+(cachedProfile.TryGetValue("name",out name)?Convert.ToString(name):"로그인됨"):"로그인 / 계정";
+        "이름 수정: "+(cachedProfile.TryGetValue("name",out name)?Convert.ToString(name):"로그인됨"):"로그인 / 계정";
     }
     void UpdateRankInfo() {
       if(rankInfo==null)return;
@@ -878,6 +902,22 @@ namespace KarmaLocal {
       return node;
     }
     void CancelLan(){lobbyLeaving=true;CloseLobby();try{File.WriteAllText(Path.Combine(support,"lan-cancel.json"),"{}",Encoding.UTF8);}catch{}}
+    void InputSettings(){
+      string folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"KarmaLAN"),file=Path.Combine(folder,"input-settings.json");
+      var settings=new Dictionary<string,object>();try{settings=json.Deserialize<Dictionary<string,object>>(File.ReadAllText(file));}catch{}
+      bool remote=SystemInformation.TerminalServerSession;object value;
+      if(settings.TryGetValue("remoteMode",out value)&&value is bool)remote=(bool)value;
+      decimal sensitivity=remote?25:100;try{if(settings.TryGetValue("sensitivity",out value))sensitivity=Convert.ToDecimal(value)*100;}catch{}
+      using(var dialog=new Form{Text="이 PC의 마우스 · 화면",ClientSize=new Size(460,240),StartPosition=FormStartPosition.CenterParent,FormBorderStyle=FormBorderStyle.FixedDialog,MaximizeBox=false,MinimizeBox=false,Font=new Font("Malgun Gothic",10)}){
+        var mode=new CheckBox{Text="원격 호환 모드 · 원본 800×600 화면 유지",Checked=remote,Left=20,Top=20,Width=420};
+        var label=new Label{Text="마우스 감도 (%)",Left=20,Top=66,Width=200};
+        var amount=new NumericUpDown{Minimum=5,Maximum=200,Value=Math.Max(5,Math.Min(200,sensitivity)),Increment=5,Left=230,Top=62,Width=100};
+        var help=new Label{Text="다음 게임 실행부터 적용됩니다. 원격 접속에서는\n감도 25%부터 조절해 보세요. 이 PC에만 저장됩니다.",Left=20,Top=108,Width=420,Height=56};
+        var save=new Button{Text="저장",Left=320,Top=180,Width=110,DialogResult=DialogResult.OK};
+        dialog.Controls.AddRange(new Control[]{mode,label,amount,help,save});dialog.AcceptButton=save;
+        if(dialog.ShowDialog(this)==DialogResult.OK){Directory.CreateDirectory(folder);File.WriteAllText(file,json.Serialize(new {remoteMode=mode.Checked,sensitivity=(double)amount.Value/100}),Encoding.UTF8);}
+      }
+    }
     void RoomServer(out string host,out int port){
       var selected=ReadSupportJson("server-selection.json");object value;IPAddress address;
       host=selected!=null&&selected.TryGetValue("host",out value)?Convert.ToString(value):"192.168.12.100";
@@ -888,7 +928,7 @@ namespace KarmaLocal {
     async Task LaunchLan(){
       bool hosting=!JoinMode,lateJoin=false;string host,code,matchMode,roomId="",roomName="";int port,maxPlayers,mapIndex,killLimit=10,roundWinLimit=5,timeLimitSeconds=600;
       if(hosting){
-        using(var dialog=new LanSetup(true,support)){
+        using(var dialog=new LanSetup(true,support,JsonNumber(MultiplayerMap(map),"maxPlayers",8))){
           if(dialog.ShowDialog(this)!=DialogResult.OK)return;
           host=dialog.Host;port=dialog.Port;code=dialog.Code;maxPlayers=dialog.MaxPlayers;matchMode=dialog.MatchMode;roomName=dialog.RoomName;
           killLimit=dialog.KillLimit;roundWinLimit=dialog.RoundWinLimit;timeLimitSeconds=dialog.TimeLimitSeconds;
@@ -928,6 +968,7 @@ namespace KarmaLocal {
       if(!hosting)options["roomId"]=roomId;
       File.WriteAllText(configPath,json.Serialize(options),Encoding.UTF8);
       try{File.Delete(Path.Combine(support,"lan-cancel.json"));File.Delete(Path.Combine(support,"lan-status.json"));}catch{}
+      try{File.Delete(Path.Combine(support,"lan-return.json"));}catch{}
       SavePreferences();sessionStartedUtc=DateTime.UtcNow;sessionError="";
       sessionHelper=Process.Start(new ProcessStartInfo{FileName=NodePath(),
         Arguments="\""+Path.Combine(support,"lan-runtime.mjs")+"\" \""+configPath+"\"",

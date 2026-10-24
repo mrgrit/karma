@@ -36,10 +36,14 @@
   const position=call('SetWindowPos','int',['pointer','pointer','int','int','int','int','uint']);
   const area=Memory.alloc(16),client=Memory.alloc(16),window=Memory.alloc(16),clipRect=Memory.alloc(16);
   const rect=memory=>[0,4,8,12].map(offset=>memory.add(offset).readS32());
+  let remoteSession=false;try{remoteSession=call('GetSystemMetrics','int',['int'])(0x1000)!==0;}catch{}
+  const inputOptions=globalThis.KARMA_INPUT_SETTINGS||{};
+  const nativeSize=typeof inputOptions.remoteMode==='boolean'?inputOptions.remoteMode:remoteSession;
   let applied=false,ready=false;
   Interceptor.attach(ptr('0x4190d0'),{onEnter(){
     if(!ready){ready=true;send({event:'game-frame-ready'});}
     if(applied)return;
+    if(nativeSize){applied=true;send({event:"remote-display-native-size",size:[800,600]});return;}
     const hwnd=ptr('0x548d50').readPointer();
     if(hwnd.isNull()||!workArea(0x30,0,area,0)||!getClient(hwnd,client)||!getRect(hwnd,window))return;
     const cw=client.add(8).readS32(),ch=client.add(12).readS32();

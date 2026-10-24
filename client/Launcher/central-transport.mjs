@@ -120,7 +120,7 @@ export async function createCentralPeer({
     if(message.type==='round-start'||message.type==='round-ended'){report({phase:message.type,...message});onMessage({...message,version:1});return;}
     if(message.type==='death-confirmed'||message.type==='proof-rejected'){
       report({phase:message.type,...message});
-      if(message.type==='death-confirmed'&&['karma290-central3','karma290-central4','karma290-central5'].includes(config.settings?.build))onMessage({...message,version:1});
+      if(message.type==='death-confirmed'&&['karma290-central3','karma290-central4','karma290-central5','karma290-central6'].includes(config.settings?.build))onMessage({...message,version:1});
       return;
     }
     if(INBOUND.has(message.type)){
@@ -143,7 +143,7 @@ export async function createCentralPeer({
     }
     if(message.type==='peer-joined'){
       const p=message.peer;
-      if(!connected||match.mode!=='dm'||config.settings?.build!=='karma290-central5'||!p||typeof p.playerId!=='string'||p.playerId===ownId||!Number.isInteger(p.slot)||p.slot<0||p.slot>7||![0,1].includes(p.team)||!p.config)throw Error('Invalid joining participant');
+      if(!connected||match.mode!=='dm'||!['karma290-central5','karma290-central6'].includes(config.settings?.build)||!p||typeof p.playerId!=='string'||p.playerId===ownId||!Number.isInteger(p.slot)||p.slot<0||p.slot>7||![0,1].includes(p.team)||!p.config)throw Error('Invalid joining participant');
       if(peers.some(peer=>peer.playerId===p.playerId))return;
       if(peers.length>=7||peers.some(peer=>peer.slot===p.slot))throw Error('Duplicate participant slot');
       peers=[...peers,p];remoteId=peers[0]?.playerId;
@@ -162,7 +162,7 @@ export async function createCentralPeer({
         // The server intentionally closes the finished match connection.
         // Keep the local game/result screen alive until the player leaves.
         closed=true;connected=false;clearTimeout(handshake);clearInterval(flushTimer);pendingState=null;
-        report({phase:'match-ended',result:message.result});socket.end();return;
+        report({phase:'match-ended',result:message.result,returnLobby:message.returnLobby});socket.end();return;
       }
       onMessage({version:1,type:'leave',reason:message.reason||'peer-left'});return;
     }
@@ -173,7 +173,7 @@ export async function createCentralPeer({
   socket.once(secure?'secureConnect':'connect',()=>{
     report({phase:'connecting',server:host});
     write({type:'hello',version:2,op:role==='host'?'create':'join',code,
-      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,...(roomId?{roomId}:{}),...(roomName?{roomName}:{}),
+      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,returnLobby:true,...(roomId?{roomId}:{}),...(roomName?{roomName}:{}),
       ...(role==='host'?{killLimit,roundWinLimit,timeLimitSeconds}:{})});
   });
   socket.on('data',chunk=>{

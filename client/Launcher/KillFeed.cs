@@ -35,9 +35,13 @@ namespace KarmaLocal {
         double at;return Double.TryParse(ChatFiles.Read(item,"receivedAt"),out at)&&now>=at&&now-at<7000;
       }).Reverse().Take(5).Reverse().ToList();
     }
+    static string Particle(string name,string consonant,string vowel){if(String.IsNullOrEmpty(name))return vowel;int c=name[name.Length-1];return c>=0xac00&&c<=0xd7a3&&(c-0xac00)%28!=0?consonant:vowel;}
     public static string Line(Dictionary<string,object> item){
       string victim=ChatFiles.Read(item,"victimName"),kind=ChatFiles.Read(item,"kind");
-      if(kind=="kill")return ChatFiles.Read(item,"killerName")+" → "+victim+"  ·  "+ChatFiles.Read(item,"weaponName")+" · "+(String.IsNullOrEmpty(ChatFiles.Read(item,"techniqueName"))?"해킹":ChatFiles.Read(item,"techniqueName"));
+      if(kind=="kill"){
+        string killer=ChatFiles.Read(item,"killerName"),weapon=ChatFiles.Read(item,"weaponName"),technique=ChatFiles.Read(item,"techniqueName");
+        return killer+Particle(killer,"이","가")+" "+victim+"에게 "+weapon+Particle(weapon,"으로","로")+" "+(String.IsNullOrEmpty(technique)?"해킹":technique)+" 공격을 했습니다.";
+      }
       if(kind=="self")return victim+"  ·  자멸 ("+ChatFiles.Read(item,"weaponName")+")";
       return victim+"  ·  사망";
     }
