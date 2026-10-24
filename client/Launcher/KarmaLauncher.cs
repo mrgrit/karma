@@ -295,7 +295,7 @@ namespace KarmaLocal {
       multiplayerMaps=ReadSupportJson("multiplayer-maps.json");
       RefreshCentralProfile();
       maps=Items("maps"); characters=Items("characters"); weapons=Items("weapons");
-      Text="카르마 · 로컬 플레이"; ClientSize=new Size(1160,810); MinimumSize=new Size(1020,720);
+      Text="카르마 v"+ReleaseTrust.Version+" · 로컬 플레이"; ClientSize=new Size(1160,810); MinimumSize=new Size(1020,720);
       StartPosition=FormStartPosition.CenterScreen; BackColor=Color.FromArgb(16,22,27); ForeColor=ink;
       Font=new Font("Malgun Gothic",9); AutoScaleMode=AutoScaleMode.Dpi;
       string icon=Path.Combine(game,"Maburi1.ico"); if(File.Exists(icon))try{Icon=new Icon(icon);}catch{}
@@ -334,7 +334,7 @@ namespace KarmaLocal {
       Controls.Add(frame);
       Panel header=new Panel{Dock=DockStyle.Fill,Margin=Padding.Empty,BackColor=Color.FromArgb(21,29,35)};
       frame.Controls.Add(header,0,0); LabelAt(header,"K A R M A",28,12,250,40,23,ink,true);
-      LabelAt(header,"LOCAL  /  290",281,26,180,26,10,accent,true);
+      LabelAt(header,"v"+ReleaseTrust.Version+"  ·  LAN",281,26,180,26,10,accent,true);
       LabelAt(header,"전장을 고르고, 바로 시작하세요.",30,55,400,24,10,muted);
       accountButton=ButtonAt(header,"로그인 / 계정",0,22,190,38);accountButton.AutoEllipsis=true;
       accountButton.Anchor=AnchorStyles.Top|AnchorStyles.Right;
