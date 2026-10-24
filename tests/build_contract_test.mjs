@@ -1,0 +1,11 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const support=new URL('../client/Launcher/',import.meta.url);
+const source=name=>fs.readFileSync(new URL(name,support),'utf8');
+const build=source('ReleaseTrust.cs').match(/GameBuild\s*=\s*"([^"]+)"/)[1];
+const runtimeBuilds=[...source('lan-runtime.mjs').matchAll(/['"](karma290-central\d+)['"]/g)].map(m=>m[1]);
+assert(runtimeBuilds.length>=2);
+assert(runtimeBuilds.every(value=>value===build),'Room browser must use the same build as initial hello and lobby equipment update');
+const directory=source('RoomDirectory.cs');
+assert(!/karma290-central\d+/.test(directory),'Do not hardcode a second protocol version in room browser');
+assert.equal((directory.match(/ReleaseTrust.GameBuild/g)||[]).length,3);
+console.log('PASS build contract: room browser admission, status and denial message match runtime hello and lobby update');

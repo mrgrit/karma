@@ -2,6 +2,11 @@ using System;using System.IO;using System.Drawing;using System.Reflection;using 
 class MasteryHudTests {
  static void Check(bool value,string text){if(!value)throw new Exception(text);}
  [STAThread]static void Main(string[] args){
+  var room=new RoomEntry{Build=ReleaseTrust.GameBuild,Joinable=true,State="waiting",Players=1,MaxPlayers=8};
+  Check(room.CanJoin&&room.StateName=="대기 중","current-build waiting room must allow joining");
+  room.State="playing";Check(room.CanJoin&&room.StateName=="진행 중 · 참가 가능","current-build late join");
+  room.Joinable=false;Check(!room.CanJoin,"server join restriction is preserved");
+  room.Joinable=true;room.Build="karma290-central5";Check(!room.CanJoin&&room.StateName=="버전 다름","old protocol remains blocked");
   Check(CoinHud.CompactLootHint("[E] MP38 · 3/30\n장문의 설명")=="[E] MP38 · 3/30","one line only");
   Check(CoinHud.CompactLootHint(new string('가',100)).Length==64,"bounded text");
   foreach(int width in new[]{800,1280,1920})foreach(float dpi in new[]{1f,1.5f,2f,3f}){
