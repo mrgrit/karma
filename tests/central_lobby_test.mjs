@@ -34,6 +34,9 @@ try {
   assert(peer.updateLobby({requestId:'gear-one',config:changed}));await wait(()=>messages.some(m=>m.requestId==='gear-one'));
   send({type:'lobby-updated',requestId:'gear-one',roomId:room.roomId,ready:false,config:changed,profile:{playerId:'one'}});
   await wait(()=>statuses.at(-1).requestId==='gear-one');assert.deepEqual(peer.effectiveConfig,changed);
+  send({...lobby,map:7,mapName:'Factory',roomRevision:1,roomSettingsEditable:true,members:[{playerId:'one',slot:1,team:1,ready:false},{playerId:'two',slot:0,team:0,ready:false}]});
+  await wait(()=>statuses.at(-1).roomRevision===1);assert.equal(peer.effectiveConfig.map,7);assert.equal(peer.slot,1);assert.equal(peer.team,1);
+  assert(peer.updateLobby({requestId:'room-edit',roomId:room.roomId,roomRevision:1,roomSettings:{map:4}}));await wait(()=>messages.some(m=>m.requestId==='room-edit'));assert.equal(messages.at(-1).roomSettings.map,4);
   assert(peer.updateLobby({requestId:'ready-one',ready:true}));await wait(()=>messages.some(m=>m.requestId==='ready-one'));
   send({type:'lobby-update-denied',requestId:'ready-one',message:'장비를 확인해 주세요.',lobby});
   await wait(()=>statuses.at(-1).phase==='lobby-update-denied');assert.equal(peer.connected,false);

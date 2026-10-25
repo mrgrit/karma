@@ -88,7 +88,7 @@ export async function createCentralPeer({
       report({phase:'listening',code:roomCode,server:host,roomId:message.room?.roomId,...match,players:1});
       return;
     }
-    if(message.type==='waiting'){match={...match,...message};report({phase:'listening',...message,localPlayerId:ownId,isHost:message.hostId===ownId,server:host});return;}
+    if(message.type==='waiting'){match={...match,...message};if(Number.isInteger(message.map))effectiveConfig={...effectiveConfig,map:message.map};const member=message.members?.find(m=>m.playerId===ownId);if(member){if(Number.isInteger(member.slot))slot=member.slot;if(Number.isInteger(member.team))team=member.team;}report({phase:'listening',...message,localPlayerId:ownId,isHost:message.hostId===ownId,server:host});return;}
     if(message.type==='start-denied'){report({phase:'start-denied',...message,...message.lobby,isHost:message.lobby?.hostId===ownId});return;}
     if(message.type==='lobby-updated'){
       if(message.config)effectiveConfig=message.config;

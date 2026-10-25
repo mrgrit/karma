@@ -77,7 +77,8 @@ const keepAlive=setInterval(()=>{
     try{
       command=readJson(lobbyCommandPath);fs.unlinkSync(lobbyCommandPath);
       if(!/^[a-f0-9]{32}$/i.test(command.requestId||''))throw Error('잘못된 대기실 요청입니다.');
-      const update={requestId:command.requestId};
+      const update={requestId:command.requestId,roomId:command.roomId};
+      if(command.roomSettings){update.roomSettings=command.roomSettings;update.roomRevision=command.roomRevision;}
       if(typeof command.ready==='boolean')update.ready=command.ready;
       if(command.config)update.config={...command.config,character:characterConfig(command.config.character),settings:{build:'karma290-central6',mode:1}};
       if(connected||command.roomId!==peer?.match?.roomId||!peer.updateLobby?.(update))throw Error('이미 대전이 시작됐거나 대기실 연결이 종료되었습니다.');
@@ -174,6 +175,7 @@ try{
         '코드 '+(detail.code||options.code)+' · '+(detail.players||1)+' / '+(detail.maxPlayers||options.maxPlayers||2)+'명 · '+
         (detail.manualStart?'장비 설정 후 준비 완료를 누르세요.':'정원이 모이면 자동 시작합니다.'),
         {roomId:detail.roomId,roomName:detail.roomName||options.roomName,localPlayerId:detail.localPlayerId||peer?.playerId,code:detail.code||options.code,players:detail.players||1,maxPlayers:detail.maxPlayers||options.maxPlayers||2,
+          map:detail.map,mapName:detail.mapName,roomRevision:detail.roomRevision,roomSettingsEditable:detail.roomSettingsEditable,availableMaps:detail.availableMaps,
           mode:detail.mode||options.matchMode,hostId:detail.hostId,isHost:detail.isHost??(options.role==='host'),manualStart:detail.manualStart===true,
           canStart:detail.canStart===true,startReason:detail.startReason||'',members:detail.members||[],gameFee:detail.gameFee||0,
           killLimit:detail.killLimit,roundWinLimit:detail.roundWinLimit,timeLimitSeconds:detail.timeLimitSeconds});

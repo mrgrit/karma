@@ -171,6 +171,36 @@ namespace KarmaLocal {
       };
     }
   }
+  public sealed class RoomSettingsDialog : Form {
+    readonly ComboBox mapBox=new ComboBox(),modeBox=new ComboBox();
+    readonly TextBox roomName=new TextBox();
+    readonly NumericUpDown seats=new NumericUpDown(),kills=new NumericUpDown(),rounds=new NumericUpDown(),minutes=new NumericUpDown();
+    readonly List<Dictionary<string,object>> mapChoices=new List<Dictionary<string,object>>();
+    static int Num(Dictionary<string,object> d,string k,int fallback){object v;int n;return d.TryGetValue(k,out v)&&Int32.TryParse(Convert.ToString(v),out n)?n:fallback;}
+    static string Str(Dictionary<string,object> d,string k){object v;return d.TryGetValue(k,out v)?Convert.ToString(v):"";}
+    public Dictionary<string,object> Settings {get{return new Dictionary<string,object>{{"map",Num(mapChoices[mapBox.SelectedIndex],"map",0)},{"roomName",roomName.Text},{"mode",new[]{"duel","dm","tdm"}[modeBox.SelectedIndex]},{"maxPlayers",(int)seats.Value},{"killLimit",(int)kills.Value},{"roundWinLimit",(int)rounds.Value},{"timeLimitSeconds",(int)minutes.Value*60}};}}
+    public RoomSettingsDialog(Dictionary<string,object> state){
+      Text="방 설정 · 맵 변경";ClientSize=new Size(490,470);AutoScaleMode=AutoScaleMode.Dpi;StartPosition=FormStartPosition.CenterParent;FormBorderStyle=FormBorderStyle.FixedDialog;MaximizeBox=false;MinimizeBox=false;Font=new Font("Malgun Gothic",10);
+      object options;if(state.TryGetValue("availableMaps",out options)&&options is IEnumerable)foreach(object item in (IEnumerable)options){var map=item as Dictionary<string,object>;if(map!=null)mapChoices.Add(map);}
+      if(mapChoices.Count==0)throw new InvalidOperationException("변경 가능한 맵 목록이 없습니다. 다시 접속해 주세요.");
+      mapBox.DropDownStyle=modeBox.DropDownStyle=ComboBoxStyle.DropDownList;
+      foreach(var map in mapChoices)mapBox.Items.Add(Str(map,"name")+" · 최대 "+Num(map,"maxPlayers",8)+"명");
+      mapBox.SelectedIndex=Math.Max(0,mapChoices.FindIndex(m=>Num(m,"map",-1)==Num(state,"map",-2)));
+      modeBox.Items.AddRange(new object[]{"1:1 대전","개인 데스매치","팀 전멸전"});modeBox.SelectedIndex=Str(state,"mode")=="tdm"?2:Str(state,"mode")=="dm"?1:0;
+      roomName.MaxLength=32;roomName.Text=Str(state,"roomName");
+      seats.Minimum=2;seats.Maximum=8;seats.Value=Math.Max(2,Math.Min(8,Num(state,"maxPlayers",2)));
+      kills.Minimum=1;kills.Maximum=30;kills.Value=Math.Max(1,Math.Min(30,Num(state,"killLimit",10)));
+      rounds.Minimum=1;rounds.Maximum=10;rounds.Value=Math.Max(1,Math.Min(10,Num(state,"roundWinLimit",5)));
+      minutes.Minimum=1;minutes.Maximum=30;minutes.Value=Math.Max(1,Math.Min(30,Num(state,"timeLimitSeconds",600)/60));
+      var labels=new[]{"방 이름","맵","대전 방식","최대 인원","목표 킬 수","팀전 목표 승수","제한 시간 (분)"};Control[] fields={roomName,mapBox,modeBox,seats,kills,rounds,minutes};
+      for(int i=0;i<fields.Length;i++){Controls.Add(new Label{Text=labels[i],Left=20,Top=22+i*45,Width=135});fields[i].SetBounds(160,18+i*45,305,30);Controls.Add(fields[i]);}
+      Controls.Add(new Label{Text="변경하면 모든 참가자의 준비가 해제됩니다.\n팀전 정원은 짝수이며 현재 참가자보다 줄일 수 없습니다.",Left=20,Top=337,Width=450,Height=52});
+      Action sync=()=>{seats.Maximum=modeBox.SelectedIndex==0?2:Num(mapChoices[mapBox.SelectedIndex],"maxPlayers",8);seats.Enabled=modeBox.SelectedIndex!=0;kills.Enabled=modeBox.SelectedIndex!=2;rounds.Enabled=modeBox.SelectedIndex==2;};
+      modeBox.SelectedIndexChanged+=(s,e)=>sync();mapBox.SelectedIndexChanged+=(s,e)=>sync();sync();
+      var save=new Button{Text="변경 적용",Left=240,Top=410,Width=110};var cancel=new Button{Text="취소",Left=360,Top=410,Width=105,DialogResult=DialogResult.Cancel};
+      save.Click+=(s,e)=>{if(seats.Value<Num(state,"players",1)||(modeBox.SelectedIndex==2&&seats.Value%2!=0)){MessageBox.Show(this,"참가자 수 이상으로, 팀전은 짝수 정원으로 설정해 주세요.");return;}DialogResult=DialogResult.OK;Close();};Controls.Add(save);Controls.Add(cancel);AcceptButton=save;CancelButton=cancel;
+    }
+  }
   public sealed class LobbyWindow : Form {
     readonly Label title,info;
     readonly ListBox members;
@@ -178,6 +208,8 @@ namespace KarmaLocal {
     readonly Action<string> requestStart;
     readonly Func<string,bool,Task> requestReady;
     readonly Func<string,Task> changeEquipment;
+    readonly Func<string,Dictionary<string,object>,Task> changeRoom;
+    readonly Button roomSettings;
     readonly Action leave;
     readonly ChatPanel chat;
     string roomId="";
@@ -185,8 +217,8 @@ namespace KarmaLocal {
     Dictionary<string,object> lastData;
     static string Read(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)?Convert.ToString(v):"";}
     static bool Flag(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)&&v is bool&&(bool)v;}
-    public LobbyWindow(Action<string> startMatch,Func<string,bool,Task> ready,Func<string,Task> equipmentChange,Action leaveRoom,string support=null) {
-      requestStart=startMatch;requestReady=ready;changeEquipment=equipmentChange;leave=leaveRoom;
+    public LobbyWindow(Action<string> startMatch,Func<string,bool,Task> ready,Func<string,Task> equipmentChange,Action leaveRoom,string support=null,Func<string,Dictionary<string,object>,Task> editRoom=null) {
+      changeRoom=editRoom;requestStart=startMatch;requestReady=ready;changeEquipment=equipmentChange;leave=leaveRoom;
       Text="카르마 · 대기실";ClientSize=new Size(720,820);MinimumSize=new Size(540,600);
       AutoScaleDimensions=new SizeF(96F,96F);AutoScaleMode=AutoScaleMode.Dpi;
       StartPosition=FormStartPosition.CenterParent;Font=new Font("Malgun Gothic",11);
@@ -199,8 +231,10 @@ namespace KarmaLocal {
       members=new ListBox{Dock=DockStyle.Fill,IntegralHeight=false,BackColor=Color.FromArgb(30,40,48),ForeColor=Color.White,BorderStyle=BorderStyle.FixedSingle};panel.Controls.Add(members,0,1);
       chat=new ChatPanel(support??ChatFiles.Support);panel.Controls.Add(chat,0,2);
       info=new Label{Dock=DockStyle.Fill,Padding=new Padding(0,12,0,0),ForeColor=Color.FromArgb(222,181,100)};panel.Controls.Add(info,0,3);
-      var preparation=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));panel.Controls.Add(preparation,0,4);
+      var preparation=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3};for(int i=0;i<3;i++)preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,33.33f));panel.Controls.Add(preparation,0,4);
       equipment=new Button{Text="장비 설정",Dock=DockStyle.Fill};readyButton=new Button{Text="준비 완료",Dock=DockStyle.Fill};preparation.Controls.Add(equipment,0,0);preparation.Controls.Add(readyButton,1,0);
+      roomSettings=new Button{Text="방 설정 · 맵 변경",Dock=DockStyle.Fill,Enabled=false};preparation.Controls.Add(roomSettings,2,0);
+      roomSettings.Click+=async(s,e)=>await Perform(()=>changeRoom(roomId,lastData));
       equipment.Click+=async(s,e)=>await Perform(()=>changeEquipment(roomId));
       readyButton.Click+=async(s,e)=>await Perform(()=>requestReady(roomId,!selfReady));
       var buttons=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2};buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,38));buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,62));panel.Controls.Add(buttons,0,5);
@@ -225,7 +259,7 @@ namespace KarmaLocal {
       chat.SetMode(mode);
       string roomName=Read(data,"roomName");int seconds;Int32.TryParse(Read(data,"timeLimitSeconds"),out seconds);
       string limits=(mode=="tdm"?Read(data,"roundWinLimit")+"승":Read(data,"killLimit")+"킬")+" / "+(seconds/60)+"분";
-      title.Text=(roomName==""?"카르마 대기실":roomName)+"    ·    "+Read(data,"players")+" / "+Read(data,"maxPlayers")+"명\n코드 "+Read(data,"code")+" · "+modeName+(host?" · 방장":"")+"\n종료 조건: "+limits+" 중 먼저 도달";
+      title.Text=(roomName==""?"카르마 대기실":roomName)+"    ·    "+Read(data,"players")+" / "+Read(data,"maxPlayers")+"명\n코드 "+Read(data,"code")+" · "+modeName+(host?" · 방장":"")+"\n"+Read(data,"mapName")+" · 종료 조건: "+limits+" 중 먼저 도달";
       var lines=new List<string>();object roster;selfReady=false;
       if(data.TryGetValue("members",out roster)&&roster is IEnumerable)foreach(object item in (IEnumerable)roster){
         var member=item as Dictionary<string,object>;if(member==null)continue;
@@ -237,6 +271,7 @@ namespace KarmaLocal {
         members.BeginUpdate();members.Items.Clear();members.Items.AddRange(lines.Cast<object>().ToArray());members.EndUpdate();
       }
       begin.Text=host?"대전 시작 →":"방장 시작 대기";begin.Enabled=!busy&&host&&manual&&Flag(data,"canStart");
+      roomSettings.Visible=host;roomSettings.Enabled=!busy&&host&&changeRoom!=null&&Flag(data,"roomSettingsEditable");
       equipment.Enabled=!busy;readyButton.Enabled=!busy;readyButton.Text=selfReady?"준비 취소":"준비 완료";
       info.Text=Read(data,"message")+(host&&!Flag(data,"canStart")?"\n"+Read(data,"startReason"):"")+(Read(data,"gameFee")=="100"?"\n대전 시작 시 1인당 1 KARMA · 대기실 입장은 무료":"");
     }
@@ -657,7 +692,7 @@ namespace KarmaLocal {
         if(d!=null){
           object value;if(d.TryGetValue("message",out value))message=Convert.ToString(value);
           if(!lobbyLeaving&&!sessionObservedGame&&d.TryGetValue("phase",out value)&&Convert.ToString(value)=="waiting"){
-            if(lobby==null||lobby.IsDisposed){lobby=new LobbyWindow(RequestLanStart,SetLobbyReady,ConfigureLobbyEquipment,()=>{lobby=null;CancelLan();},support);lobby.UpdateLobby(d);lobby.Show(this);}
+            if(lobby==null||lobby.IsDisposed){lobby=new LobbyWindow(RequestLanStart,SetLobbyReady,ConfigureLobbyEquipment,()=>{lobby=null;CancelLan();},support,ConfigureLobbyRoom);lobby.UpdateLobby(d);lobby.Show(this);}
             else lobby.UpdateLobby(d);
           }else CloseLobby();
         }
@@ -704,6 +739,12 @@ namespace KarmaLocal {
       var next=new Dictionary<string,object>(lobbyConfig);
       next["inventory"]=selected["inventory"];next["selectedWeapon"]=selected["selectedWeapon"];
       await UpdateLobbyState(roomId,new Dictionary<string,object>{{"config",next}});
+    }
+    async Task ConfigureLobbyRoom(string roomId,Dictionary<string,object> state){
+      await SetLobbyReady(roomId,false);
+      using(var dialog=new RoomSettingsDialog(state)){
+        if(dialog.ShowDialog(lobby)==DialogResult.OK)await UpdateLobbyState(roomId,new Dictionary<string,object>{{"roomSettings",dialog.Settings},{"roomRevision",JsonNumber(state,"roomRevision",0)}});
+      }
     }
     Dictionary<string,object> ReadSupportJson(string filename) {
       try{
