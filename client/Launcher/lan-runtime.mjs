@@ -8,6 +8,7 @@ import {createLanPeer} from './lan-transport.mjs';
 import {createCentralPeer} from './central-transport.mjs';
 import {startCoinHud} from './coin-hud.mjs';
 import {addKillFeed} from './kill-feed.mjs';
+import {writeHudHint} from './hud-state.mjs';
 const support=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(support,'..'),game=path.join(root,'App_Executables');
 const readJson=file=>JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
@@ -34,6 +35,13 @@ try{fs.unlinkSync(startPath);}catch{}
 for(const file of [lobbyCommandPath,lobbyResultPath])try{fs.unlinkSync(file);}catch{}
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
 const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
+// Record unexpected callback failures before Node exits; do not swallow them
+// or leave a partially failed transport running.
+process.on('uncaughtExceptionMonitor',error=>{
+  const message=String(error?.message||error);
+  try{log('launch-error',{message,stack:String(error?.stack||'')});}catch{}
+  try{status('error',message);}catch{}
+});
 let peer,device,pid,session,script,ended=false,closing=false,rpcReady=false,connected=false,
   failureReason='',endReason='',startupTimer,validationTimer,pauseChild,pauseTimer,closeCoinHud,accountProfile={},matchResult=null,resultFiles=[],returnLobby=null,returnRequested=false;
 const checkClosing=()=>{if(closing)throw Error('LAN 대전이 취소되었습니다.');};
@@ -261,7 +269,7 @@ try{
       return;
     }
     if(payload.event==='lan-loot-hint'&&typeof payload.message==='string'){
-      fs.writeFileSync(lootHintPath,JSON.stringify({gamePid:pid,expiresAt:Date.now()+Math.max(500,Math.min(10000,Number(payload.ttlMs)||3000)),message:payload.message.slice(0,200)}));
+      writeHudHint(lootHintPath,{gamePid:pid,expiresAt:Date.now()+Math.max(500,Math.min(10000,Number(payload.ttlMs)||3000)),message:payload.message.slice(0,200)});
     }
     log('agent',payload);
     if(payload.event==='offline-player-death')status('playing',peer.match?.mode==='tdm'?'전사 · 팀전은 다음 라운드에 다시 등장합니다.':peer.match?.mode==='dm'?'전사 · 10초 후 랜덤 위치에서 다시 등장합니다.':'전사 · 잠시 후 다시 등장합니다.');

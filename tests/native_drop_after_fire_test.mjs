@@ -53,7 +53,7 @@ if(originalProbe){const comparable=Buffer.from(originalProbe);for(const offset o
 fs.writeFileSync(probe,template);
 const dataDir=fs.mkdtempSync(path.join(os.tmpdir(),'karma-eight-native-'));
 const server=await startKarmaServer({host:'127.0.0.1',port:0,healthPort:0,dataDir,logger:()=>{}});
-const frida=await import(pathToFileURL(path.join(gameRoot,'Runtime/node_modules/frida/build/src/frida.js')).href);
+const frida=await import(pathToFileURL(path.join(process.env.KARMA_FRIDA_ROOT||gameRoot,'Runtime/node_modules/frida/build/src/frida.js')).href);
 const device=await frida.getLocalDevice();
 const logPath=path.join(work,'native-drop-after-fire.jsonl');fs.writeFileSync(logPath,'');
 const log=(event,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),event,...details})+'\n');
@@ -61,7 +61,7 @@ const delay=ms=>new Promise(r=>setTimeout(r,ms));
 const clients=[];let failure=null,stopping=false;
 const character={index:dual?4:0,camp:0,model:dual?'cpom_020.chr':'cpom_050.chr',name:'Player'};
 const startingXp=dual?6000:0,blastWeapon=dual?21:6;
-const config={map:mapIndex,age:0,character,inventory:dual?[50,9,21,22,255,255,255]:[50,9,1,6,48,24,18],selectedWeapon:9,settings:{build:'karma290-central5',mode:1}};
+const config={map:mapIndex,age:0,character,inventory:dual?[50,9,21,22,255,255,255]:[50,9,1,6,48,24,18],selectedWeapon:9,settings:{build:'karma290-central6',mode:1}};
 async function wait(label,predicate,timeout=20000){
  const deadline=Date.now()+timeout;
  while(Date.now()<deadline){if(failure)throw failure;const r=await predicate();if(r)return r;await delay(200);}
@@ -87,7 +87,7 @@ async function connect(i,reuse){
  const token=server.auth.issueSession(account).authToken;
  const response=await fetch(`http://127.0.0.1:${server.healthPort}/api/admin/users/${account.playerId}`,{method:'PATCH',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({xp:1000})});assert.equal(response.status,200);
  const c={i,account,role:i===0?'host':'join',events:[],pending:[]};clients.push(c);
- const offered={map:mapIndex,age:0,inventory:[50,14,1,21,48,24,19],selectedWeapon:21,character:{index:chars[i],camp:0,model:models[i],name:'Late '+i},settings:{build:'karma290-central5',mode:1}};
+ const offered={map:mapIndex,age:0,inventory:[50,14,1,21,48,24,19],selectedWeapon:21,character:{index:chars[i],camp:0,model:models[i],name:'Late '+i},settings:{build:'karma290-central6',mode:1}};
  c.peer=await createCentralPeer({role:c.role,host:'127.0.0.1',port:server.port,secure:false,identityPath:null,
   identity:{authToken:token},code:'888123',config:offered,maxPlayers:2,mode:'dm',manualStart:true,
   onStatus:x=>{log('transport',{client:i,...x});if(x.phase==='disconnected'&&!stopping)failure=Error(x.message||'unexpected disconnect');},onProfile:x=>{c.profile=x;},
@@ -102,7 +102,7 @@ async function launch(c){
  let source='globalThis.KARMA_LAN_CONFIG='+JSON.stringify({role:c.role,central:true,local,equipmentCatalog,
   localPlayerId:c.peer.playerId,remotePlayerId:c.peer.remotePlayerId,remoteHello:c.hello,peers:c.peer.peers,
   slot:c.peer.slot,team:c.peer.team,match:c.peer.match})+';\n';
- for(const name of [path.join(work,'ai_unattended_shim.js'),...['startup-diagnostics.js','offline-death.js','window-size.js'].map(n=>path.join(support,n))])source+='\n(()=>{\n'+fs.readFileSync(name,'utf8')+'\n})();\n';
+ for(const name of [path.join(work,'ai_unattended_shim.js'),...['startup-diagnostics.js','legacy-controls.js','native-font.js','offline-death.js','window-size.js'].map(n=>path.join(support,n))])source+='\n(()=>{\n'+fs.readFileSync(name,'utf8')+'\n})();\n';
  // A single executable image stays open while multiple probes run. The original
  // model-name records are configured at the same pre-loader boundary as peers.
  source+=`Interceptor.attach(ptr(0x420560),{onEnter(){this.g=this.context.ecx;},onLeave(r){if(!r.toInt32())return;for(const p of [this.g.add(0x8e),this.g.add(0xc).readPointer().add(0x1768)]){p.writeByteArray(new Uint8Array(20));p.writeUtf8String(globalThis.KARMA_LAN_CONFIG.local.character.model);}}});\n`;

@@ -39,9 +39,13 @@ namespace KarmaLocal {
       feed=new KillFeedHud(gamePid);
       timer.Tick+=(s,e)=>UpdateHud();Shown+=(s,e)=>{UpdateHud();chat.Show();feed.Show();};FormClosed+=(s,e)=>{timer.Dispose();chat.Close();feed.Close();loot.Close();};timer.Start();
     }
+    static string ReadSharedText(string path) {
+      using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
+      using(var reader=new StreamReader(stream))return reader.ReadToEnd();
+    }
     public static string ReadBalance() {
       try {
-        var json=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","central-profile.json")));
+        var json=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(ReadSharedText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","central-profile.json")));
         object value;if(!json.TryGetValue("coins",out value))return "코인 조회 대기";
         var coins=value as Dictionary<string,object>;
         if(coins==null||!coins.TryGetValue("available",out value)||value==null)return "코인 연결 대기";
@@ -50,7 +54,7 @@ namespace KarmaLocal {
     }
     string ReadLootHint(){
       try{
-        var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","loot-hint.json")));
+        var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(ReadSharedText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","loot-hint.json")));
         object id,until,text;
         if(!value.TryGetValue("gamePid",out id)||Convert.ToInt32(id)!=gamePid||!value.TryGetValue("expiresAt",out until)||
           Convert.ToDouble(until)<(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds||!value.TryGetValue("message",out text))return "";
