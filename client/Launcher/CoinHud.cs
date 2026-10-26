@@ -58,6 +58,12 @@ namespace KarmaLocal {
         return "일당 "+Amount(coins,"daily")+"/"+Amount(coins,"dailyCap")+" · 보너스 "+Amount(coins,"bonus")+" · 기본 "+Amount(coins,"base");
       }catch{return "코인 구분 조회 대기";}
     }
+    public static string ReadRefill(){
+      try{var profile=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(ReadSharedText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","central-profile.json")));
+        var coins=(Dictionary<string,object>)profile["coins"];
+        return "오늘 추가 충전 "+Amount(coins,"dailyRefilled")+"/"+Amount(coins,"dailyRefillLimit")+"개 · 남은 충전 "+Amount(coins,"dailyRefillRemaining")+"개";
+      }catch{return "추가 충전 조회 대기";}
+    }
     static string Amount(Dictionary<string,object> coins,string key){object value;return coins.TryGetValue(key,out value)&&value!=null?(Convert.ToDecimal(value)/100m).ToString("N2"):"—";}
     string ReadLootHint(){
       try{

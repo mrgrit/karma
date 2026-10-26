@@ -413,7 +413,7 @@ namespace KarmaLocal {
       var stats=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty,Padding=new Padding(24,6,24,10),BackColor=Color.FromArgb(21,29,35)};
       foreach(float width in new float[]{25,29,23,23})stats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,width));
       stats.RowStyles.Add(new RowStyle(SizeType.Percent,100));frame.Controls.Add(stats,0,1);
-      var personnel=StatsCard(stats,0,"내 전적",out myRank,out myXp);myName=personnel;myXp.Cursor=Cursors.Hand;myXp.Click+=(s,e)=>MessageBox.Show(this,"내 코인 "+CoinHud.ReadBalance()+"\n\n"+CoinHud.ReadBreakdown()+"\n\n차감: 일당 → 보너스 → 기본\n일당: 자정 충전 · 30분마다 1개 회복\n양도·장터·거래: 보너스만 사용","내 코인 상세");
+      var personnel=StatsCard(stats,0,"내 전적",out myRank,out myXp);myName=personnel;myXp.Cursor=Cursors.Hand;myXp.Click+=(s,e)=>MessageBox.Show(this,"내 코인 "+CoinHud.ReadBalance()+"\n\n"+CoinHud.ReadBreakdown()+"\n\n차감: 일당 → 보너스 → 기본\n일당: 자정에 훈련병 10개 · 진급마다 +2개\n추가 회복: 30분마다 1개 · 전 계급 하루 최대 10개\n"+CoinHud.ReadRefill()+"\n양도·장터·거래: 보너스만 사용","내 코인 상세");
       StatsCard(stats,1,"승 / 패 / 무",out myResults,out myMatches);
       StatsCard(stats,2,"킬 / 데스",out myKd,out myRatio);
       StatsCard(stats,3,"승률",out myWinrate,out mySync);

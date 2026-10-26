@@ -20,6 +20,14 @@ class ReleaseUpdateTests {
       string[] paths={"KarmaLauncher.exe","KarmaUpdater.exe","Launcher/input.js","Launcher/new.js"};
       var release=new ReleaseManifest{schema=1,version="test",sequence=10,files=paths.Select(p=>new ReleaseFile{path=p,size=Encoding.UTF8.GetByteCount("new "+p),sha256=ReleaseUpdate.Hash(Encoding.UTF8.GetBytes("new "+p))}).ToArray()};
       byte[] envelope=Sign(release,key);ReleaseUpdate.DurableWrite(Path.Combine(stage,"manifest.json"),envelope);
+      using(var other=new RSACryptoServiceProvider(2048)){other.PersistKeyInCsp=false;Reject(()=>ReleaseUpdate.Parse(envelope,other.ToXmlString(false)),"wrong trust key accepted");}
+      // Reinstalling with the new signing key must not replay an old-key interrupted update.
+      string legacy=Path.GetDirectoryName(ReleaseUpdate.StateDirectory(root));
+      Check(Path.GetFileName(ReleaseUpdate.StateDirectory(root))==ReleaseTrust.KeyEpoch,"trust namespace missing");
+      File.WriteAllText(Path.Combine(legacy,"pending"),"obsolete-key-update");
+      File.WriteAllText(Path.Combine(legacy,"sequence"),"9999999999");
+      ReleaseUpdate.Recover(root,pub);ReleaseUpdate.CheckSequence(root,release);
+      File.Delete(Path.Combine(legacy,"pending"));File.Delete(Path.Combine(legacy,"sequence"));
       foreach(var file in release.files)ReleaseUpdate.DurableWrite(ReleaseUpdate.SafePath(Path.Combine(stage,"files"),file.path),Encoding.UTF8.GetBytes("new "+file.path));
       foreach(string file in paths.Take(3))ReleaseUpdate.DurableWrite(ReleaseUpdate.SafePath(root,file),Encoding.UTF8.GetBytes("old "+file));
       string personal=Path.Combine(root,"Launcher","selection.json");File.WriteAllText(personal,"personal settings");

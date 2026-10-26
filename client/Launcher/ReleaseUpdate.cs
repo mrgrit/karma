@@ -25,7 +25,7 @@ namespace KarmaLocal {
     internal static string Hash(byte[] data) { using(var sha=SHA256.Create())return BitConverter.ToString(sha.ComputeHash(data)).Replace("-","").ToLowerInvariant(); }
     internal static string HashFile(string file) { using(var sha=SHA256.Create())using(var stream=File.OpenRead(file))return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","").ToLowerInvariant(); }
     internal static string Identity(string root) { return Hash(Encoding.UTF8.GetBytes(Path.GetFullPath(root).TrimEnd('\\').ToUpperInvariant())).Substring(0,24); }
-    internal static string StateDirectory(string root) { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"KarmaLAN","updates",Identity(root)); }
+    internal static string StateDirectory(string root) { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"KarmaLAN","updates",Identity(root),ReleaseTrust.KeyEpoch); }
     internal static Mutex Acquire(string root) {
       var mutex=new Mutex(false,"Local\\KarmaRelease_"+Identity(root));
       bool acquired=false;try{acquired=mutex.WaitOne(0);}catch(AbandonedMutexException){acquired=true;}
