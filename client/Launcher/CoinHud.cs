@@ -52,6 +52,13 @@ namespace KarmaLocal {
         return (Convert.ToDecimal(value)/100m).ToString("N2")+" KARMA";
       }catch{return "코인 조회 대기";}
     }
+    public static string ReadBreakdown(){
+      try{var profile=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(ReadSharedText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","central-profile.json")));
+        var coins=(Dictionary<string,object>)profile["coins"];
+        return "일당 "+Amount(coins,"daily")+"/"+Amount(coins,"dailyCap")+" · 보너스 "+Amount(coins,"bonus")+" · 기본 "+Amount(coins,"base");
+      }catch{return "코인 구분 조회 대기";}
+    }
+    static string Amount(Dictionary<string,object> coins,string key){object value;return coins.TryGetValue(key,out value)&&value!=null?(Convert.ToDecimal(value)/100m).ToString("N2"):"—";}
     string ReadLootHint(){
       try{
         var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(ReadSharedText(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","loot-hint.json")));

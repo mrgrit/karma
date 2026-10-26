@@ -22,6 +22,7 @@ namespace KarmaLocal {
     TabControl tabs;
     TextBox loginEmail,loginPassword,signupEmail,signupPassword,signupName,verificationCode;
     Label status,verificationHelp;
+    CheckBox rulesConsent;
     Button action,resend,edit;
     Panel verificationPanel;
     bool busy,pending,accountMode;
@@ -89,6 +90,9 @@ namespace KarmaLocal {
       signupEmail=Field(signup,"이메일",false,254);
       signupPassword=Field(signup,"비밀번호 (8~128자)",true,128);
       signup.Controls.Add(TextLabel("이메일은 로그인에 사용됩니다. 관리자 승인 후 게임과 거래소를 이용할 수 있습니다."));
+      var readRules=MakeButton("게임·코인 규정 읽기");readRules.Click+=(s,e)=>ViewRules(this,support);signup.Controls.Add(readRules);
+      rulesConsent=new CheckBox{Text="게임·코인 운영 규정과 제재 기준에 동의합니다.",AutoSize=true,Margin=new Padding(0,12,0,12)};
+      rulesConsent.CheckedChanged+=(s,e)=>UpdateUi();signup.Controls.Add(rulesConsent);
       verificationPanel=new Panel{Dock=DockStyle.Top,AutoSize=true,Visible=false,Margin=Padding.Empty};
       var verification=FormGrid(verificationPanel);verification.Padding=Padding.Empty;
       verificationCode=Field(verification,"이메일 인증번호 (숫자 6자리)",false,6);
@@ -151,7 +155,7 @@ namespace KarmaLocal {
       tabs.Enabled=!busy;
       bool verifying=tabs.SelectedIndex==1&&pending;
       action.Text=tabs.SelectedIndex==0?"로그인":verifying?"인증 완료 · 가입 신청":"가입 신청";
-      action.Enabled=!busy&&(!verifying||
+      action.Enabled=!busy&&(tabs.SelectedIndex==0||rulesConsent.Checked)&&(!verifying||
         (DateTime.UtcNow<expiresAt&&verificationCode.Text.Length==6&&verificationCode.Text.All(c=>c>='0'&&c<='9')));
       verificationPanel.Visible=pending;
       if(pending){
@@ -173,11 +177,12 @@ namespace KarmaLocal {
     async Task RequestRegistration() {
       if(busy)return;
       await Perform(async()=>{
+        if(!rulesConsent.Checked)throw new InvalidOperationException("게임·코인 운영 규정에 동의해 주세요.");
         string name=signupName.Text.Trim();
         if(name.Length<1||name.Length>32||name.Any(Char.IsControl))
           throw new InvalidOperationException("게임 이름은 제어문자 없이 1~32자로 입력해 주세요.");
         var response=await Send(new Dictionary<string,object>{{"operation","request"},
-          {"email",Email(signupEmail)},{"password",Password(signupPassword)},{"displayName",name}});
+          {"email",Email(signupEmail)},{"password",Password(signupPassword)},{"displayName",name},{"rulesAccepted",true},{"rulesVersion",RulesVersion(support)}});
         RequireSuccess(response);
         if(Flag(response,"approvalRequired")){ShowApprovalPending(response);return;}
         if(!Flag(response,"requiresVerification",true)&&Dict(response,"profile")!=null){
@@ -263,6 +268,37 @@ namespace KarmaLocal {
       });}finally{input=null;request.Clear();}
       if(closing||IsDisposed)throw new OperationCanceledException();
       return response;
+    }
+    static Dictionary<string,object> Rules(string folder){return new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(folder,"game-rules.json"),Encoding.UTF8));}
+    static string RulesVersion(string folder){return Convert.ToString(Rules(folder)["version"]);}
+    static string RulesText(string folder){
+      var rules=Rules(folder);var text=new StringBuilder(Convert.ToString(rules["title"])+" · "+rules["version"]+"\r\n\r\n");
+      foreach(var entry in (System.Collections.IEnumerable)rules["sections"]){var section=(Dictionary<string,object>)entry;text.AppendLine(Convert.ToString(section["title"]));text.AppendLine(Convert.ToString(section["text"]));text.AppendLine();}
+      text.AppendLine("제재 기준");foreach(var entry in (System.Collections.IEnumerable)rules["levels"]){var level=(Dictionary<string,object>)entry;text.AppendLine(level["level"]+"단계 · "+level["name"]+" · "+level["coins"]+"코인 / "+level["days"]+"일 · "+level["examples"]);}
+      return text.ToString();
+    }
+    public static void ViewRules(IWin32Window owner,string folder){
+      using(var dialog=new Form{Text="게임·코인 운영 규정",ClientSize=new Size(680,560),StartPosition=FormStartPosition.CenterParent,Font=new Font("Malgun Gothic",10),AutoScaleMode=AutoScaleMode.Dpi}){
+        var text=new TextBox{Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,Text=RulesText(folder)};dialog.Controls.Add(text);dialog.ShowDialog(owner);
+      }
+    }
+    public void ShowRules(){
+      accountMode=true;Text="카르마 · 운영 규정 동의";
+      foreach(Control c in Controls.Cast<Control>().ToArray()){Controls.Remove(c);c.Dispose();}
+      ClientSize=new Size(680,620);
+      var frame=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=4,ColumnCount=1,Padding=new Padding(16)};
+      frame.RowStyles.Add(new RowStyle(SizeType.AutoSize));frame.RowStyles.Add(new RowStyle(SizeType.Percent,100));frame.RowStyles.Add(new RowStyle(SizeType.AutoSize));frame.RowStyles.Add(new RowStyle(SizeType.AutoSize));Controls.Add(frame);
+      frame.Controls.Add(TextLabel("대전과 거래를 이용하기 전에 운영 규정을 확인해 주세요.",true),0,0);
+      frame.Controls.Add(new TextBox{Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Vertical,Dock=DockStyle.Fill,Text=RulesText(support)},0,1);
+      var agree=new CheckBox{Text="운영 규정·코인 정책·제재 기준을 읽고 동의합니다.",AutoSize=true,Margin=new Padding(0,12,0,12)};frame.Controls.Add(agree,0,2);
+      var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,AutoSize=true};status=TextLabel("");action=MakeButton("동의하고 계속");action.Enabled=false;
+      var cancel=MakeButton("나중에");cancel.DialogResult=DialogResult.Cancel;buttons.Controls.Add(action);buttons.Controls.Add(cancel);buttons.Controls.Add(status);frame.Controls.Add(buttons,0,3);
+      // The account-mode timer must never enable this button without consent.
+      timer.Stop();agree.CheckedChanged+=(s,e)=>action.Enabled=agree.Checked&&!busy;
+      action.Click+=async(s,e)=>{if(!agree.Checked||busy)return;busy=true;action.Enabled=false;
+        try{var result=await Send(new Dictionary<string,object>{{"operation","rules"},{"rulesAccepted",true},{"rulesVersion",RulesVersion(support)}});RequireSuccess(result);Authenticated=true;DialogResult=DialogResult.OK;Close();}
+        catch(Exception ex){status.Text=ex.Message;}finally{busy=false;if(!closing&&!IsDisposed)action.Enabled=agree.Checked;}};
+      AcceptButton=action;CancelButton=cancel;
     }
     public void ShowAccount(Dictionary<string,object> profile) {
       accountMode=true;Text="카르마 · 계정";

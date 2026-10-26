@@ -11,12 +11,12 @@ const reply=value=>console.log(JSON.stringify(value));
 try{
   if(!/^[a-zA-Z0-9.:-]{1,253}$/.test(host)||!Number.isInteger(port)||port<1||port>65534)throw Error('Invalid server address');
   const request=JSON.parse(input),operation=request.operation;
-  const routes={login:'/auth/login',request:'/auth/register/request',verify:'/auth/register/verify',logout:'/auth/logout',rename:'/api/name'};
+  const routes={login:'/auth/login',request:'/auth/register/request',verify:'/auth/register/verify',logout:'/auth/logout',rename:'/api/name',rules:'/auth/rules'};
   if(!routes[operation])throw Error('Invalid authentication operation');
   const file=identityPathFor(host,port),identity=readIdentity(file);
-  const data=JSON.stringify(operation==='rename'?{name:request.displayName}:operation==='logout'?{}:operation==='verify'?
+  const data=JSON.stringify(operation==='rules'?{rulesAccepted:request.rulesAccepted,rulesVersion:request.rulesVersion}:operation==='rename'?{name:request.displayName}:operation==='logout'?{}:operation==='verify'?
     {email:request.email,code:request.code}:
-    {email:request.email,password:request.password,...(operation==='request'?{name:request.displayName}: {})});
+    {email:request.email,password:request.password,...(operation==='request'?{name:request.displayName,rulesAccepted:request.rulesAccepted,rulesVersion:request.rulesVersion}: {})});
   const result=await new Promise((resolve,reject)=>{
     const req=https.request({host,port:port+1,path:routes[operation],method:'POST',
       ca:fs.readFileSync(defaultCa),rejectUnauthorized:true,timeout:15000,
@@ -32,7 +32,7 @@ try{
   if(operation==='logout'){
     for(const target of [file,path.join(support,'central-profile.json')])try{fs.unlinkSync(target);}catch(error){if(error.code!=='ENOENT')throw error;}
     reply({ok:true,message:'로그아웃했습니다.'});
-  }else if(result.ok&&operation==='rename'&&result.profile){
+  }else if(result.ok&&['rename','rules'].includes(operation)&&result.profile){
     fs.writeFileSync(path.join(support,'central-profile.json'),JSON.stringify(result.profile));
     reply({ok:true,profile:result.profile});
   }else if(result.ok&&result.authToken&&result.profile){

@@ -53,7 +53,7 @@ namespace KarmaLocal {
       MaximizeBox=false;MinimizeBox=false;TopMost=true;KeyPreview=true;
       BackColor=Color.FromArgb(21,29,35);ForeColor=Color.White;Font=new Font("Malgun Gothic",11);
       var heading=new Label{Text=(lan?"LAN 메뉴 · 대전은 계속됩니다.":"일시 정지")+"\n내 코인   "+CoinHud.ReadBalance(),Location=new Point(24,22),Size=new Size(362,70)};
-      Controls.Add(heading);
+      heading.Text+="\n"+CoinHud.ReadBreakdown();heading.Font=new Font("Malgun Gothic",9);Controls.Add(heading);
       Button resume=new Button{Text="계속  (F10)",Location=new Point(24,115),Size=new Size(170,48)};
       Button exit=new Button{Text="게임 종료…",Location=new Point(210,115),Size=new Size(176,48)};
       var matchStatus=new Label{Location=new Point(24,91),Size=new Size(362,80),ForeColor=Color.FromArgb(223,184,105)};
@@ -413,7 +413,7 @@ namespace KarmaLocal {
       var stats=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4,RowCount=1,Margin=Padding.Empty,Padding=new Padding(24,6,24,10),BackColor=Color.FromArgb(21,29,35)};
       foreach(float width in new float[]{25,29,23,23})stats.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,width));
       stats.RowStyles.Add(new RowStyle(SizeType.Percent,100));frame.Controls.Add(stats,0,1);
-      var personnel=StatsCard(stats,0,"내 전적",out myRank,out myXp);myName=personnel;
+      var personnel=StatsCard(stats,0,"내 전적",out myRank,out myXp);myName=personnel;myXp.Cursor=Cursors.Hand;myXp.Click+=(s,e)=>MessageBox.Show(this,"내 코인 "+CoinHud.ReadBalance()+"\n\n"+CoinHud.ReadBreakdown()+"\n\n차감: 일당 → 보너스 → 기본\n일당: 자정 충전 · 30분마다 1개 회복\n양도·장터·거래: 보너스만 사용","내 코인 상세");
       StatsCard(stats,1,"승 / 패 / 무",out myResults,out myMatches);
       StatsCard(stats,2,"킬 / 데스",out myKd,out myRatio);
       StatsCard(stats,3,"승률",out myWinrate,out mySync);
@@ -788,7 +788,7 @@ namespace KarmaLocal {
       myName.Text="내 전적 · "+name;myRank.Text=rank;myXp.Text="XP "+profileXp.ToString("N0");
       var coins=JsonDict(cachedProfile,"coins");object available;
       if(coins!=null){bool current=coins.TryGetValue("available",out available)&&available!=null;
-        myXp.Text+="  ·  "+(current?(Convert.ToDecimal(available)/100m).ToString("N2")+" KARMA":"코인 조회 대기");}
+        myXp.Text+="  ·  "+(current?(Convert.ToDecimal(available)/100m).ToString("N2")+" KARMA · 상세 보기":"코인 조회 대기");}
       myResults.Text=wins.ToString("N0")+" / "+losses.ToString("N0")+" / "+draws.ToString("N0");
       myMatches.Text="총 "+matches.ToString("N0")+"경기 · 종료된 경기 기준";
       myKd.Text=kills.ToString("N0")+" / "+deaths.ToString("N0");
@@ -917,6 +917,9 @@ namespace KarmaLocal {
       var profile=JsonDict(cached,"profile")??cached;
       if(JsonNumber(profile,"xp",-1)<0||!File.Exists(cache)||File.GetLastWriteTimeUtc(cache)<requested.AddSeconds(-1))
         throw new InvalidDataException("서버의 최신 계급 기록을 받지 못했습니다. 다시 연결해 주세요.");
+      object rulesNeeded;if(profile!=null&&profile.TryGetValue("rulesRequired",out rulesNeeded)&&rulesNeeded is bool&&(bool)rulesNeeded){
+        using(var consent=new AuthDialog(root,support,node,host,port)){consent.ShowRules();if(consent.ShowDialog(this)!=DialogResult.OK)throw new InvalidOperationException("대전과 거래를 이용하려면 운영 규정에 동의해 주세요.");}
+      }
       profileLoginRequired=false;profileSyncMessage=DateTime.Now.ToString("HH:mm")+" 서버 기록 갱신";
       RefreshCentralProfile();UpdateRankInfo();
       menuMusic.Connected(GameRunning());UpdateMusic(false);
