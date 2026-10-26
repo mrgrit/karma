@@ -1,7 +1,12 @@
-// Original rank ordinals: recruit=0, private=1, corporal=3,
-// sergeant=4, second lieutenant=8. These are display records only.
+// Original native rank dispatch (0x4c1660) and icon renderer (0x42f160)
+// support officers 8..17, from second lieutenant to general.
+// These are display records only; progression and budgets remain server-owned.
 (() => {
-  const rankIds = Object.freeze({recruit:0,private:1,corporal:3,sergeant:4,lieutenant:8});
+  const rankIds = Object.freeze({
+    recruit:0,private:1,corporal:3,sergeant:4,lieutenant:8,
+    first_lieutenant:9,captain:10,major:11,lieutenant_colonel:12,colonel:13,
+    brigadier_general:14,major_general:15,lieutenant_general:16,general:17
+  });
   const cfg = globalThis.KARMA_LAN_CONFIG;
   let localRank = cfg?.local?.rank || globalThis.KARMA_ACCOUNT_PROFILE?.rank;
   let gm = null, dirty = false;
