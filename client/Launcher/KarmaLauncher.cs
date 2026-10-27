@@ -141,6 +141,7 @@ namespace KarmaLocal {
       goals.Controls.Add(killLimit);goals.Controls.Add(roundLimit);roundLimit.Visible=false;
       if(host){panel.Controls.Add(goalLabel);panel.Controls.Add(goals);panel.Controls.Add(new Label{Text="제한 시간 (1~30분)",AutoSize=true});panel.Controls.Add(timeLimit);}
       matchMode.SelectedIndexChanged+=(s,e)=>{capacity.Enabled=matchMode.SelectedIndex==2;bool team=matchMode.SelectedIndex==1;killLimit.Visible=!team;roundLimit.Visible=team;goalLabel.Text=team?"목표 라운드 승수 (1~10승)":"목표 킬 (1~30킬)";};
+      if(host)matchMode.SelectedIndex=2;
       panel.Controls.Add(new Label{Text=host?"최소 인원이 모이고 모두 준비 완료하면 방장이 시작합니다.\n팀전: 짝수 인원 · 양끝 시작 · 라운드 종료 후 부활\n개인전: 사망 10초 후 랜덤 부활":"대기실에 입장한 뒤 장비를 설정하고 준비 완료를 누르세요.",
         AutoSize=true,Dock=DockStyle.Fill,Margin=new Padding(0,0,0,18)});
       var buttons=new FlowLayoutPanel{Dock=DockStyle.Top,AutoSize=true,FlowDirection=FlowDirection.RightToLeft};
