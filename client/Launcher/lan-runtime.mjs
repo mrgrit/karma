@@ -175,7 +175,7 @@ try{
         return;
       }
       if(phase==='chat-denied'){chatError=detail.message;chatErrorAt=Date.now();saveChat();return;}
-      log('lan-status',detail);
+      if(!detail.latencyOnly)log('lan-status',detail);
       if(phase==='lobby-updated'||phase==='lobby-update-denied'){
         fs.writeFileSync(lobbyResultPath,JSON.stringify({requestId:detail.requestId,ok:phase==='lobby-updated',message:detail.message||'',ready:detail.ready,config:detail.config}));
       }

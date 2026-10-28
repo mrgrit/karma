@@ -28,6 +28,13 @@ static class KarmaLobbyValidation {
       lobby.UpdateLobby(State(false,false));Check(!start.Enabled,"Unready lobby cannot start");Check(Field<Button>(lobby,"roomSettings").Enabled,"Host can edit room");Check(ready.Text=="준비 완료","Initial ready action");
       Check(Field<Label>(lobby,"title").Text.Contains("학과 친구들과"),"Room name visible");
       Check(Field<ListBox>(lobby,"members").Items.Count==2,"Both unready seats visible");
+      var pingState=State(false,false);var pingRoster=(object[])pingState["members"];
+      ((Dictionary<string,object>)pingRoster[0])["pingStatus"]="ok";((Dictionary<string,object>)pingRoster[0])["pingMs"]=23;
+      ((Dictionary<string,object>)pingRoster[1])["pingStatus"]="timeout";lobby.UpdateLobby(pingState);
+      var roster=Field<ListBox>(lobby,"members");Check(roster.Items[0].ToString().Contains("핑 23 ms"),"Measured RTT visible");Check(roster.Items[1].ToString().Contains("핑 응답 없음"),"Timeout never displays zero latency");
+      ((Dictionary<string,object>)pingRoster[0])["pingMs"]=0;((Dictionary<string,object>)pingRoster[1])["pingStatus"]="unsupported";lobby.UpdateLobby(pingState);
+      Check(roster.Items[0].ToString().Contains("핑 <1 ms"),"Sub-millisecond RTT visible");Check(roster.Items[1].ToString().Contains("핑 미지원"),"Legacy compatibility visible");
+      ((Dictionary<string,object>)pingRoster[1])["pingStatus"]="measuring";lobby.UpdateLobby(pingState);Check(roster.Items[1].ToString().Contains("핑 측정 중"),"Pending measurement visible");Check(!start.Enabled,"Ping update never enables an unready match");
       lobby.UpdateLobby(State(true,false));Check(!start.Enabled,"Guest configuring blocks start");Check(ready.Text=="준비 취소","Ready host can cancel");
       lobby.UpdateLobby(State(true,true));Check(start.Enabled,"All ready host can start");
       var run=(Task)lobby.GetType().GetMethod("Perform",BindingFlags.Instance|BindingFlags.NonPublic).Invoke(lobby,new object[]{new Func<Task>(()=>{gearRequests++;return pending.Task;})});

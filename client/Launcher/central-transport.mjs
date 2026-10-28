@@ -77,6 +77,11 @@ export async function createCentralPeer({
   }
   function receive(message){
     if(message.type==='error')throw Error(message.code+': '+message.message);
+    if(message.type==='latency-probe'){
+      if(welcomed&&!connected&&typeof message.token==='string'&&/^[a-f0-9]{24}$/.test(message.token))
+        write({type:'latency-reply',token:message.token});
+      return;
+    }
     if(message.type==='welcome'){
       if(welcomed)throw Error('Invalid welcome');
       welcomed=true;clearTimeout(handshake);
@@ -173,7 +178,7 @@ export async function createCentralPeer({
   socket.once(secure?'secureConnect':'connect',()=>{
     report({phase:'connecting',server:host});
     write({type:'hello',version:2,op:role==='host'?'create':'join',code,
-      authToken:identity.authToken,config,clientMaxPlayers:8,maxPlayers,mode,manualStart,returnLobby:true,...(roomId?{roomId}:{}),...(roomName?{roomName}:{}),
+      authToken:identity.authToken,config,clientMaxPlayers:8,lobbyPing:1,maxPlayers,mode,manualStart,returnLobby:true,...(roomId?{roomId}:{}),...(roomName?{roomName}:{}),
       ...(role==='host'?{killLimit,roundWinLimit,timeLimitSeconds}:{})});
   });
   socket.on('data',chunk=>{

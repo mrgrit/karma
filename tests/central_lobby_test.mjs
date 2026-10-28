@@ -23,6 +23,14 @@ try {
   assert.equal(messages[0].killLimit,30);assert.equal(messages[0].roundWinLimit,10);assert.equal(messages[0].timeLimitSeconds,1800);
   assert.equal(peer.connected,false);assert.equal(statuses.at(-1).isHost,true);assert.equal(statuses.at(-1).canStart,false);
   assert.equal(statuses.at(-1).localPlayerId,'one');
+  assert.equal(messages[0].lobbyPing,1,'client explicitly advertises latency protocol');
+  const probe='0123456789abcdef01234567';send({type:'latency-probe',token:probe});
+  await wait(()=>messages.some(m=>m.type==='latency-reply'&&m.token===probe));
+  assert.deepEqual(messages.find(m=>m.type==='latency-reply'),{type:'latency-reply',token:probe},'echo no claimed latency or client clock');
+  const replyCount=messages.filter(m=>m.type==='latency-reply').length;
+  send({type:'latency-probe',token:'malformed'});await delay(30);assert.equal(messages.filter(m=>m.type==='latency-reply').length,replyCount);
+  send({...lobby,latencyOnly:true,members:lobby.members.map(m=>({...m,pingMs:23,pingStatus:'ok'}))});
+  await wait(()=>statuses.at(-1).latencyOnly===true);assert.equal(statuses.at(-1).members[0].pingMs,23);assert.equal(peer.connected,false);
   assert(peer.sendChat('all','대기실 채팅','chat1'));await wait(()=>messages.some(m=>m.type==='chat-send'&&m.requestId==='chat1'));
   send({type:'chat',roomId:room.roomId,id:'line1',name:'Host',text:'대기실 채팅',channel:'all',senderId:'one'});
   await wait(()=>statuses.at(-1).phase==='chat');assert.equal(gameMessages.length,0,'chat never enters native online handlers');
@@ -49,6 +57,7 @@ try {
   send({...lobby,hostId:'one'});await wait(()=>statuses.at(-1).isHost===true);
   send({type:'peer-ready',config,profile:{playerId:'one'},mode:'dm',maxPlayers:8,peers:[{playerId:'two',config}],remoteHello:{playerId:'two',config}});
   await peer.ready;assert.equal(peer.connected,true);assert.equal(peer.startMatch(),false);
+  send({type:'latency-probe',token:'abcdef0123456789abcdef01'});await delay(30);assert.equal(messages.filter(m=>m.type==='latency-reply').length,replyCount,'ignore in-flight lobby probe after game starts');
   assert.equal(peer.updateLobby({requestId:'too-late',ready:false}),false);
   assert(peer.sendChat('all','게임 중 채팅','chat2'));await wait(()=>messages.some(m=>m.requestId==='chat2'));
   console.log('PASS central lobby adapter: room name, unready roster, equipment acknowledgement, explicit readiness, nonfatal denial, host transfer, start and post-start guard.');

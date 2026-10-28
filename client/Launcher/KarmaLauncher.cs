@@ -203,6 +203,7 @@ namespace KarmaLocal {
     }
   }
   public sealed class LobbyWindow : Form {
+    readonly ToolTip pingTip=new ToolTip();
     readonly Label title,info;
     readonly ListBox members;
     readonly Button begin,readyButton,equipment;
@@ -218,6 +219,11 @@ namespace KarmaLocal {
     Dictionary<string,object> lastData;
     static string Read(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)?Convert.ToString(v):"";}
     static bool Flag(Dictionary<string,object> data,string key){object v;return data.TryGetValue(key,out v)&&v is bool&&(bool)v;}
+    static string PingText(Dictionary<string,object> member){
+      string status=Read(member,"pingStatus");int ms;
+      if(status=="ok"&&Int32.TryParse(Read(member,"pingMs"),out ms)&&ms>=0&&ms<=5000)return ms==0?"핑 <1 ms":"핑 "+ms+" ms";
+      return status=="timeout"?"핑 응답 없음":status=="unsupported"||status==""?"핑 미지원":"핑 측정 중";
+    }
     public LobbyWindow(Action<string> startMatch,Func<string,bool,Task> ready,Func<string,Task> equipmentChange,Action leaveRoom,string support=null,Func<string,Dictionary<string,object>,Task> editRoom=null) {
       changeRoom=editRoom;requestStart=startMatch;requestReady=ready;changeEquipment=equipmentChange;leave=leaveRoom;
       Text="카르마 · 대기실";ClientSize=new Size(720,820);MinimumSize=new Size(540,600);
@@ -229,7 +235,9 @@ namespace KarmaLocal {
       panel.RowStyles.Add(new RowStyle(SizeType.Absolute,94));panel.RowStyles.Add(new RowStyle(SizeType.Percent,35));panel.RowStyles.Add(new RowStyle(SizeType.Percent,65));
       panel.RowStyles.Add(new RowStyle(SizeType.Absolute,108));panel.RowStyles.Add(new RowStyle(SizeType.Absolute,48));panel.RowStyles.Add(new RowStyle(SizeType.Absolute,58));Controls.Add(panel);
       title=new Label{Dock=DockStyle.Fill,Font=new Font("Malgun Gothic",13,FontStyle.Bold),AutoEllipsis=true};panel.Controls.Add(title,0,0);
-      members=new ListBox{Dock=DockStyle.Fill,IntegralHeight=false,BackColor=Color.FromArgb(30,40,48),ForeColor=Color.White,BorderStyle=BorderStyle.FixedSingle};panel.Controls.Add(members,0,1);
+      members=new ListBox{Dock=DockStyle.Fill,IntegralHeight=false,HorizontalScrollbar=true,BackColor=Color.FromArgb(30,40,48),ForeColor=Color.White,BorderStyle=BorderStyle.FixedSingle};panel.Controls.Add(members,0,1);
+      pingTip.SetToolTip(members,"각 PC와 중앙 서버 사이의 왕복 지연시간 · 약 3초마다 측정 · 낮을수록 빠른 응답");
+      Disposed+=(s,e)=>pingTip.Dispose();
       chat=new ChatPanel(support??ChatFiles.Support);panel.Controls.Add(chat,0,2);
       info=new Label{Dock=DockStyle.Fill,Padding=new Padding(0,12,0,0),ForeColor=Color.FromArgb(222,181,100)};panel.Controls.Add(info,0,3);
       var preparation=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3};for(int i=0;i<3;i++)preparation.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,33.33f));panel.Controls.Add(preparation,0,4);
@@ -266,7 +274,7 @@ namespace KarmaLocal {
         var member=item as Dictionary<string,object>;if(member==null)continue;
         string team=mode=="tdm"?(Read(member,"team")=="0"?"[RED]  ":"[BLUE]  "):"";
         bool mine=Read(member,"playerId")==Read(data,"localPlayerId");if(mine)selfReady=Flag(member,"ready");
-        lines.Add((Flag(member,"ready")?"[준비 완료]  ":"[준비 중]  ")+team+Read(member,"name")+(mine?" (나)":"")+(Read(member,"playerId")==Read(data,"hostId")?"   (방장)":""));
+        lines.Add((Flag(member,"ready")?"[준비 완료]  ":"[준비 중]  ")+"["+PingText(member)+"]  "+team+Read(member,"name")+(mine?" (나)":"")+(Read(member,"playerId")==Read(data,"hostId")?"   (방장)":""));
       }
       if(!members.Items.Cast<object>().Select(Convert.ToString).SequenceEqual(lines)){
         members.BeginUpdate();members.Items.Clear();members.Items.AddRange(lines.Cast<object>().ToArray());members.EndUpdate();
