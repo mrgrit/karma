@@ -307,7 +307,9 @@ namespace KarmaLocal {
       row.Picker=MakePicker();
       foreach(int id in row.Allowed.OrderBy(id=>id==emptyId?-1:id))row.Picker.Items.Add(weapons[id]);
       row.Detail=Wrapped("",8,muted);
-      middle.Controls.Add(row.Picker);middle.Controls.Add(row.Detail);line.Controls.Add(middle,2,0);
+      middle.Controls.Add(row.Picker);middle.Controls.Add(row.Detail);
+      if(row.Key=="med")middle.Controls.Add(Wrapped("구급약 대신 방탄복·헬멧을 선택할 수 있습니다. 같은 장비는 중복 착용할 수 없습니다.",8,muted));
+      line.Controls.Add(middle,2,0);
       row.Cost=new Label{Text="",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleRight,ForeColor=accent};
       line.Controls.Add(row.Cost,3,0);scrollContent.Controls.Add(line);
       tips.SetToolTip(row.Cost,"원본 상점 필요능력치");
