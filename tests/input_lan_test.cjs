@@ -130,6 +130,27 @@ for(const origin of ['escape','rpc','native']) {
   const acquired=h.acquired();h.frame();h.keyboard();h.mouse();h.command('resume');
   assert.equal(h.s.cursor,0);assert.equal(h.acquired(),acquired);
 }
+{
+  const h=harness();h.context.KARMA_LAN_CONFIG={match:{mode:'tdm'}};
+  h.windowMessage(0x100,0x59);
+  h.windowMessage(0x414,7); // Original native termination notification.
+  h.windowMessage(0x102,0xac00); // Chat text must never enter exit diagnostics.
+  h.nativeQuit(0,0x4379ae);
+  const event=h.events.find(e=>e.kind==='exit-requested');
+  assert.equal(event.source,'native-quit');assert.equal(event.confirmation,false);
+  assert.equal(event.inputState.paused,true);assert.equal(event.inputState.matchFinished,false);
+  assert.equal(event.nativeOrigin.caller,'0x4379ae');
+  assert.equal(event.nativeOrigin.windowMessage.message,0x414);
+  assert.equal(event.nativeOrigin.windowMessage.param,7);
+  assert(!JSON.stringify(event).includes('44032'),'diagnostics contain no typed chat characters');
+  assert.equal(h.s.quits,1);
+}
+{
+  const h=harness();h.command('quit');h.windowMessage(0x84a1);
+  const exits=h.events.filter(e=>e.kind==='exit-requested');
+  assert.equal(exits.length,1,'native PostQuitMessage cannot overwrite the explicit exit origin');
+  assert.equal(exits[0].source,'external-menu');assert.equal(exits[0].nativeOrigin,null);
+}
 assert.throws(()=>harness('gate'),/Unsupported game dispatcher call/);
 console.log('PASS: LAN native frame/clock continuity, independent input pause flag, no world-pause callback, zero polling without reacquire, focus-loss release/foreground recovery, stable cursor counts, short F10/Escape handling and permanent exit release.');
 

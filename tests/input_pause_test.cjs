@@ -80,8 +80,8 @@ function harness(bad = '', inputSettings = {}) {
     },
     ClipCursor:rect=>{assert(rect.isNull());calls.push(['clip']);return 1;},
     PostMessageW:(hwnd,msg,w,l)=>{calls.push(['post',hwnd.n,msg,w.n,l.n]);return 1;},
-    PostQuitMessage:()=>{
-      const hook=hooks.get('PostQuitMessage');if(hook)hook.onEnter();
+    PostQuitMessage:(code=0,caller=0x43791f)=>{
+      const hook=hooks.get('PostQuitMessage');if(hook)hook.onEnter.call({returnAddress:p(caller)},[p(code)]);
       s.quits++;
     }
   };

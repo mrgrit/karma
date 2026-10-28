@@ -103,6 +103,10 @@ function polledPressAllowed(source, index, held) {
   return false;
 }
 let lastForeground = false, cursorIncrements = 0, cursorReleased = false;
+// Keep only shutdown-relevant window metadata, never the user's chat text.
+// A peer's original client can quit outside our menu; retain its native caller
+// so the next session log distinguishes that path from an explicit leave.
+let lastLifecycleMessage = null;
 const commands = [];
 globalThis.KARMA_LOCAL_PAUSED = false;
 globalThis.KARMA_LOCAL_INPUT_PAUSED = false;
@@ -290,8 +294,10 @@ function showResults() {
   send({ kind: 'results-ready', hwnd: ptr('0x548d50').readPointer().toString(), pid: Process.id });
   return true;
 }
-function latchExit(source) {
+function latchExit(source, nativeOrigin = null) {
   if (exitRequested) return false;
+  const inputState = { paused, matchFinished, resumePending, cursorReleased,
+    foreground: foreground().toString() };
   exitRequested = true;
   resumePending = false;
   escapeDown = true;
@@ -304,7 +310,8 @@ function latchExit(source) {
   catch (error) { send({ kind: 'exit-release-warning', message: String(error) }); }
   try { clearInputBuffers(getInput()); }
   catch (error) { send({ kind: 'exit-clear-warning', message: String(error) }); }
-  send({ kind: 'exit-requested', source, confirmation: source === 'external-menu' });
+  send({ kind: 'exit-requested', source, confirmation: source === 'external-menu',
+    inputState, nativeOrigin });
   return true;
 }
 function requestExit(source) {
@@ -315,7 +322,12 @@ function requestExit(source) {
 // Direct API is for game-thread hooks, such as practice completion.
 globalThis.KARMA_LOCAL_REQUEST_EXIT = requestExit;
 retained.listeners.push(Interceptor.attach(user32.getExportByName('PostQuitMessage'), {
-  onEnter() { latchExit('native-quit'); }
+  onEnter() {
+    latchExit('native-quit', {
+      caller: this.returnAddress ? this.returnAddress.toString() : null,
+      windowMessage: lastLifecycleMessage
+    });
+  }
 }));
 
 // RPC runs on Frida's thread. Wake the game's message loop, then execute all
@@ -393,6 +405,13 @@ retained.listeners.push(Interceptor.attach(ptr('0x436c50'), {
   onEnter(args) {
     this.message = args[1].toInt32();
     const param = args[2].toInt32();
+    const hwnd = ptr('0x548d50').readPointer();
+    if (!hwnd.isNull() && args[0].equals(hwnd) &&
+        ([0x02, 0x10, 0x82].includes(this.message) ||
+          this.message === 0x112 && (param & 0xfff0) === 0xf060 ||
+          this.message >= 0x400 && this.message < 0x500)) {
+      lastLifecycleMessage = { message: this.message, param, at: Date.now() };
+    }
     const keyDown = this.message === 0x100 || this.message === 0x104;
     const keyUp = this.message === 0x101 || this.message === 0x105;
     if ((keyDown || keyUp) && [0x1b, 0x79, 0x54, 0x59, 0x0d].includes(param)) {

@@ -78,6 +78,14 @@ try{
   await new Promise(resolve=>setTimeout(resolve,80));
   assert(messages.some(x=>x.message?.seq===16),'Denied pickup releases the still-valid pose');
   assert.equal(peer.connected,true);
+  wire.write(JSON.stringify({type:'game',version:2,senderId:'two',message:{version:1,type:'leave'}})+'\n');
+  await new Promise(resolve=>setTimeout(resolve,30));
+  assert(!inbound.some(x=>x.type==='leave'),'Legacy per-player leave cannot close the local match');
+  assert.equal(peer.connected,true,'Wait for authoritative departure or match result');
+  wire.write(JSON.stringify({type:'peer-left',version:2,playerId:'two'})+'\n');
+  await new Promise(resolve=>setTimeout(resolve,30));
+  assert(inbound.some(x=>x.type==='peer-left'&&x.playerId==='two'));
+  assert.equal(peer.connected,true,'Peer departure alone leaves match continuation to server');
   wire.write(JSON.stringify({type:'match-ended',version:2,result:{winnerIds:['one'],draw:false,scores:{one:10,two:3}}})+'\n');
   await new Promise(resolve=>setTimeout(resolve,30));
   assert.equal(statuses.find(x=>x.phase==='match-ended').result.scores.one,10);

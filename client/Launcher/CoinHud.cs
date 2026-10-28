@@ -24,6 +24,7 @@ namespace KarmaLocal {
     readonly int gamePid,parentPid;
     readonly ChatHud chat;
     readonly LootHintHud loot=new LootHintHud();
+    readonly LootHintHud spectator=new LootHintHud(true);
     readonly KillFeedHud feed;
     readonly Timer timer=new Timer {Interval=300};
     string balance="코인 조회 대기",lootHint="";
@@ -37,7 +38,7 @@ namespace KarmaLocal {
       ClientSize=new Size(230,44);StartPosition=FormStartPosition.Manual;Location=new Point(-10000,-10000);
       chat=new ChatHud(gamePid);
       feed=new KillFeedHud(gamePid);
-      timer.Tick+=(s,e)=>UpdateHud();Shown+=(s,e)=>{UpdateHud();chat.Show();feed.Show();};FormClosed+=(s,e)=>{timer.Dispose();chat.Close();feed.Close();loot.Close();};timer.Start();
+      timer.Tick+=(s,e)=>UpdateHud();Shown+=(s,e)=>{UpdateHud();chat.Show();feed.Show();};FormClosed+=(s,e)=>{timer.Dispose();chat.Close();feed.Close();loot.Close();spectator.Close();};timer.Start();
     }
     static string ReadSharedText(string path) {
       using(var stream=new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete))
@@ -79,6 +80,22 @@ namespace KarmaLocal {
       string line=message.Split(new[]{'\r','\n'},StringSplitOptions.RemoveEmptyEntries)[0];
       return line.Length>64?line.Substring(0,63)+"…":line;
     }
+    public static string SpectatorText(Dictionary<string,object> value){
+      if(ChatFiles.Read(value,"active")!="True"&&ChatFiles.Read(value,"waiting")!="True")return "";
+      string name=CompactLootHint(ChatFiles.Read(value,"targetName"));
+      if(name=="")return "아군 관전 대기 · 살아 있는 아군이 없습니다.\n다음 라운드에 다시 등장합니다.";
+      string weapon=CompactLootHint(ChatFiles.Read(value,"weaponName"));
+      string ammo=ChatFiles.Read(value,"magazine");
+      return "아군 관전 · "+name+"\n체력 "+ChatFiles.Read(value,"hp")+" · "+weapon+
+        (ammo==""?"":" · 탄약 "+ammo+" / "+ChatFiles.Read(value,"reserve"))+"\n← / → 아군 전환 · 다음 라운드에 복귀";
+    }
+    string ReadSpectator(){
+      try{var value=ChatFiles.ReadState(Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher","pause-spectator-state.json"));
+        double until;if(ChatFiles.Read(value,"gamePid")!=gamePid.ToString()||!Double.TryParse(ChatFiles.Read(value,"expiresAt"),out until)||
+          until<(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds)return "";
+        return SpectatorText(value);
+      }catch{return "";}
+    }
     public static Rectangle HudBounds(int width,int height,float dpiScale){
       float scale=Math.Max(.75f,Math.Min(dpiScale,Math.Min(width/800f,height/600f)));
       int w=Math.Min(width,(int)(190*scale)),h=(int)(22*scale),gap=(int)(12*scale);
@@ -91,11 +108,12 @@ namespace KarmaLocal {
         using(var parent=Process.GetProcessById(parentPid))if(parent.HasExited){Close();return;}
         using(var game=Process.GetProcessById(gamePid)) {
           if(game.HasExited){Close();return;}IntPtr hwnd=game.MainWindowHandle;
-          if(hwnd==IntPtr.Zero||GetForegroundWindow()!=hwnd||IsIconic(hwnd)){if(Visible)Hide();loot.Hide();return;}
+          if(hwnd==IntPtr.Zero||GetForegroundWindow()!=hwnd||IsIconic(hwnd)){if(Visible)Hide();loot.Hide();spectator.Hide();return;}
           Rect rect;var origin=new PointNative();if(!GetClientRect(hwnd,out rect)||!ClientToScreen(hwnd,ref origin))return;
           string next=ReadBalance(),hint=ReadLootHint();
           float scale=Math.Max(.75f,Math.Min(GetDpiForWindow(hwnd)/96f,Math.Min(rect.Right/800f,rect.Bottom/600f)));bool scaleChanged=displayScale!=scale;displayScale=scale;
           loot.Place(origin.X,origin.Y,rect.Right,rect.Bottom,scale,hint);
+          spectator.Place(origin.X,origin.Y,rect.Right,rect.Bottom,scale,ReadSpectator());
           var bounds=HudBounds(rect.Right,rect.Bottom,scale);
           SetWindowPos(Handle,new IntPtr(-1),origin.X+bounds.X,origin.Y+bounds.Y,bounds.Width,bounds.Height,0x0010);
           if(next!=balance||hint!=lootHint||scaleChanged){balance=next;lootHint=hint;Invalidate();}
@@ -125,19 +143,20 @@ namespace KarmaLocal {
   }
   public sealed class LootHintHud : Form {
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int height,uint flags);
-    string hint="";float scale=1;
+    string hint="";float scale=1;readonly bool observer;
     protected override bool ShowWithoutActivation{get{return true;}}
     protected override CreateParams CreateParams{get{var p=base.CreateParams;p.ExStyle|=0x08000000|0x00000020|0x00000080;return p;}}
-    public LootHintHud(){FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;AutoScaleMode=AutoScaleMode.None;DoubleBuffered=true;BackColor=Color.Magenta;TransparencyKey=BackColor;Location=new Point(-10000,-10000);}
-    public static Rectangle HudBounds(int width,int height,float dpi){
+    public LootHintHud(bool spectator=false){observer=spectator;FormBorderStyle=FormBorderStyle.None;ShowInTaskbar=false;TopMost=true;AutoScaleMode=AutoScaleMode.None;DoubleBuffered=true;BackColor=Color.Magenta;TransparencyKey=BackColor;Location=new Point(-10000,-10000);}
+    public static Rectangle HudBounds(int width,int height,float dpi,bool spectator=false){
       float s=Math.Max(.75f,Math.Min(dpi,Math.Min(width/800f,height/600f)));
+      if(spectator){int sw=Math.Min((int)(480*s),(int)(width*.7)),sh=(int)(58*s);return new Rectangle((width-sw)/2,Math.Max(0,height-(int)(138*s)),sw,sh);}
       int w=Math.Min((int)(360*s),(int)(width*.45)),h=(int)(24*s);
       return new Rectangle((width-w)/2,Math.Max(0,height-(int)(62*s)),w,h);
     }
     public void Place(int x,int y,int width,int height,float dpi,string text){
       if(String.IsNullOrEmpty(text)){Hide();return;}
       bool changed=hint!=text||scale!=dpi;hint=text;scale=dpi;
-      var b=HudBounds(width,height,dpi);SetWindowPos(Handle,new IntPtr(-1),x+b.X,y+b.Y,b.Width,b.Height,0x0010);if(changed)Invalidate();if(!Visible)Show();
+      var b=HudBounds(width,height,dpi,observer);SetWindowPos(Handle,new IntPtr(-1),x+b.X,y+b.Y,b.Width,b.Height,0x0010);if(changed)Invalidate();if(!Visible)Show();
     }
     protected override void WndProc(ref Message m){if(m.Msg==0x84){m.Result=new IntPtr(-1);return;}if(m.Msg==0x21){m.Result=new IntPtr(3);return;}base.WndProc(ref m);}
     protected override void OnPaint(PaintEventArgs e){

@@ -49,7 +49,7 @@ namespace KarmaLocal {
       using(var game=Process.GetProcessById(pid)){
         if(game.HasExited){Close();return;}IntPtr h=game.MainWindowHandle;
         if(h==IntPtr.Zero||GetForegroundWindow()!=h){if(Visible)Hide();return;}
-        Dictionary<string,object> state=null;try{state=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(ChatFiles.Support,"pause-kill-feed.json")));}catch{}
+        var state=ChatFiles.ReadState(Path.Combine(ChatFiles.Support,"pause-kill-feed.json"));
         var recent=Recent(state,pid,(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds);
         if(recent.Count==0){if(Visible)Hide();return;}
         localId=ChatFiles.Read(state,"localPlayerId");string next=String.Join("|",recent.Select(r=>ChatFiles.Read(r,"id")));

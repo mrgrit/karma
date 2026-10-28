@@ -14,6 +14,8 @@ const state = (seq, overrides = {}) => ({
 });
 const hit = (id, seq) => ({type: 'hit', version: 1, life: 1, seq, victimLife: 1, kind: 'bullet', id, weapon: 9, region: 1, direction: [1, 0, 0], armorPierce: 0});
 const shot = id => ({id, life: 1, weapon: 9, origin: [0, 700, 0], direction: [1, 0, 0], sector: 4, renderSector: 4, yaw: 0, pitch: 0});
+assert.equal(validateLanMessage(state(1,{viewFov:.4})).viewFov,.4,'Scoped view passes to spectators');
+for(const viewFov of [-1,0,.01,3,NaN,Infinity])assert.throws(()=>validateLanMessage(state(1,{viewFov})),/viewFov|finite/i);
 async function eventually(predicate, label, timeout = 2500) {
   const end = Date.now() + timeout;
   while (!predicate()) {

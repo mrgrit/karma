@@ -4,5 +4,5 @@ namespace KarmaLocal { internal static class ReleaseTrust {
  internal const string Origin = "https://192.168.12.100:29021";
  internal const string GameBuild = "karma290-central6";
  internal const string KeyEpoch = "v080";
- internal const string Version = "0.8.4";
+ internal const string Version = "0.8.5";
 } }

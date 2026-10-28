@@ -14,7 +14,12 @@ namespace KarmaLocal {
   public static class ChatFiles {
     public static string Support {get{return Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"Launcher");}}
     public static string Read(Dictionary<string,object> d,string k){object v;return d!=null&&d.TryGetValue(k,out v)?Convert.ToString(v):"";}
-    public static Dictionary<string,object> State(string support){try{return new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(support,"pause-chat-state.json"),Encoding.UTF8));}catch{return null;}}
+    // These are live presentation snapshots written by the match runtime.
+    // File.ReadAllText denies concurrent writes on Windows, which used to turn
+    // an ordinary chat/death notification into a transport callback failure.
+    internal static StreamReader OpenStateReader(string path){return new StreamReader(new FileStream(path,FileMode.Open,FileAccess.Read,FileShare.ReadWrite|FileShare.Delete),Encoding.UTF8,true);}
+    internal static Dictionary<string,object> ReadState(string path){try{using(var reader=OpenStateReader(path))return new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(reader.ReadToEnd());}catch{return null;}}
+    public static Dictionary<string,object> State(string support){return ReadState(Path.Combine(support,"pause-chat-state.json"));}
     public static List<Dictionary<string,object>> Messages(Dictionary<string,object> state){
       object v;return state!=null&&state.TryGetValue("messages",out v)&&v is IEnumerable?((IEnumerable)v).Cast<object>().OfType<Dictionary<string,object>>().ToList():new List<Dictionary<string,object>>();
     }

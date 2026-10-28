@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 const source=fs.readFileSync('native/lan_game_core.js','utf8')
  .replace('/*__MAPS__*/','const mapDefinitions='+JSON.stringify(JSON.parse(fs.readFileSync('client/Launcher/multiplayer-maps.json','utf8')).maps)+';')
  .replace('/*__TEST_DISPATCH__*/','const testNativeShotDispatch=null;')
- .replace('/*__LOADOUT__*/',fs.readFileSync('native/lan_loadout_game.js','utf8'));
+ .replace('/*__LOADOUT__*/',fs.readFileSync('native/lan_loadout_game.js','utf8'))
+ .replace('/*__SPECTATOR__*/',fs.readFileSync('native/lan_spectator_game.js','utf8'));
 const fixture=[];
 function create(role,config={}){
  const bytes=new Map(),events=[],hooks=new Map(),calls=[];let time=1000000,allocation=0x70000;

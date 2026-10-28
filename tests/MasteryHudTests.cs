@@ -19,7 +19,14 @@ class MasteryHudTests {
    Check(loot.Left>=width*.25&&loot.Right<=width*.75,"loot avoids native weapon and inventory at right");
    Check(loot.Top>=height*.85&&loot.Bottom<height,"loot is beneath chat and away from crosshair");
    Check(!loot.IntersectsWith(b),"coin and pickup surfaces are separate");
+   var observer=LootHintHud.HudBounds(width,height,dpi,true);
+   Check(observer.Left>=0&&observer.Right<=width&&observer.Top>=0&&observer.Bottom<height,"spectator caption stays inside viewport");
+   Check(!observer.Contains(width/2,height/2)&&!observer.IntersectsWith(loot),"spectator caption avoids aim and pickup hint");
   }
+  Check(CoinHud.SpectatorText(new Dictionary<string,object>{{"active",false}})=="","inactive spectator hides caption");
+  Check(CoinHud.SpectatorText(new Dictionary<string,object>{{"active",false},{"waiting",true}}).Contains("살아 있는 아군이 없습니다"),"waiting caption");
+  string observerText=CoinHud.SpectatorText(new Dictionary<string,object>{{"active",true},{"targetName","아군A"},{"hp",64},{"weaponName","MP38"},{"magazine",12},{"reserve",34}});
+  Check(observerText.Contains("아군A")&&observerText.Contains("체력 64")&&observerText.Contains("12 / 34")&&observerText.Contains("← / →"),"spectator identity, health, ammunition, and controls");
   string chatDir=Path.Combine(Path.GetTempPath(),"karma-chat-ui-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(chatDir);
   try {using(var panel=new ChatPanel(chatDir)){
     bool sent=false;panel.Sent+=()=>sent=true;

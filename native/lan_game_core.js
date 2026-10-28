@@ -62,6 +62,7 @@ function friendly(peer){return teamMode&&peer?.team===selfTeam;}
 function syncLegacy(){const p=peers.find(p=>!p.left)||peers[0];st.r=p?.r||null;st.remoteLife=p?.life||0;st.remoteSeq=p?.seq??-1;st.remoteDead=p?.dead??true;st.latestRemote=p?.latest||null;st.remotePaused=p?.paused??false;}
 
 /*__LOADOUT__*/
+/*__SPECTATOR__*/
 function emit(message){send({event:'lan-outbound',message:{version:1,life:st.life,seq:++st.seq,...message}});}
 function boundedRemember(set,key){if(set.has(key))return false;set.add(key);if(set.size>512)set.delete(set.values().next().value);return true;}
 function remoteConfig(){return peers[0].config||cfg.remoteHello?.config||cfg.remote||{};}
@@ -77,6 +78,7 @@ function validPose(x){
  return vector(x.pos)&&finite(x.yaw,1e4)&&finite(x.pitch,2)&&integer(x.sector,0,255)&&
  integer(x.weapon,0,50)&&integer(x.hp,0,100)&&
  (x.eyeHeight===undefined||finite(x.eyeHeight,1000)&&x.eyeHeight>=30)&&
+ (x.viewFov===undefined||finite(x.viewFov,2.8)&&x.viewFov>=0.03)&&
  (x.stance===undefined||integer(x.stance,0,3))&&
  (x.body===undefined||integer(x.body,0,31))&&
  (x.weaponAnim===undefined||integer(x.weaponAnim,0,31));
@@ -142,10 +144,11 @@ function localDeath(killer='environment',weapon=-1,attackerId=null){
 function localPose(){
  const p=st.p,pos=vec(p,0x1a40),eye=vec(p,0x1c84),direction=vec(p,0x1c78);
  const height=eye[1]-pos[1],pitch=Math.atan2(direction[1],Math.hypot(direction[0],direction[2]));
+ const camera=st.m.add(0x1054).readPointer(),fov=camera.isNull()?NaN:camera.add(0x2c0).readFloat();
  return {pos,yaw:p.add(0x19b8).readFloat(),pitch:Number.isFinite(pitch)?pitch:0,
   sector:p.add(0x1b44).readS32(),weapon:p.add(0x290).readU8(),hp:Math.max(0,Math.min(100,hp(p))),
   stance:p.add(0x1970).readU8(),body:p.add(0x1971).readU8(),weaponAnim:p.add(0x1972).readU8(),
-  eyeHeight:finite(height,1000)&&height>=30?height:300,paused:globalThis.KARMA_LOCAL_INPUT_PAUSED===true,
+  eyeHeight:finite(height,1000)&&height>=30?height:300,...(finite(fov,2.8)&&fov>=0.03?{viewFov:fov}:{}),paused:globalThis.KARMA_LOCAL_INPUT_PAUSED===true,
   inventory:[...(loot.inventory||[])],selectedWeapon:p.add(0x290).readU8(),
   ammo:(()=>{const r=weaponRecord(p,p.add(0x290).readU8());return r.capacity>0&&r.magazine>=0&&r.reserve>=0?{[r.weapon]:{magazine:r.magazine,reserve:r.reserve}}:{};})(),
   shotSequence:st.shotSequence,...(st.lastShot?{shot:st.lastShot}:{})};
@@ -551,7 +554,7 @@ rpc.exports=Object.assign(rpc.exports||{},{
    sector:st.r.add(0x1b44).readS32(),model:st.r.add(0x1f00).readS32(),spawned:st.r.add(0x19b0).readS32()}:null,
   scores:scores(),peers:peers.map(p=>({id:p.id,index:p.index,team:p.team,life:p.life,left:p.left,dead:p.dead,latest:p.latest,
    actual:p.r?{pos:vec(p.r,0x1a40),hp:hp(p.r),weapon:p.r.add(0x290).readU8(),team:p.r.add(0x262).readU8(),model:p.r.add(0x1f00).readS32(),visible:p.r.add(0x1e24).readU8(),spawned:p.r.add(0x19b0).readS32(),active:p.r.add(0x19b4).readS32(),rank:st.gm.add(0xb04+p.index*0x98).readS32()}:null})),
-  queue:st.queue.length,loadout:inventoryStatus(),retainedModelCount:retainedModels.size,
+  queue:st.queue.length,loadout:inventoryStatus(),spectator:spectatorStatus(),retainedModelCount:retainedModels.size,
   modelCache:st.ready?Array.from({length:8},(_,i)=>{const p=st.m.add(0x48+i*4).readPointer();return {index:i,pointer:p.toString(),name:p.isNull()?null:p.add(8).readUtf8String().toLowerCase()};}):[],
   sentHits:st.sentHits,receivedHits:st.receivedHits,remoteShots:st.remoteShots,hitHooks:st.hitHooks,renderCalls:st.renderCalls};},
  placeLocal(pos,sector,yaw=0){

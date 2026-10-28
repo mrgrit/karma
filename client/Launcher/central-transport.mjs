@@ -120,7 +120,11 @@ export async function createCentralPeer({
     }
     if(message.type==='game'){
       if(!connected||!peers.some(p=>p.playerId===message.senderId))return;
-      onMessage({...validateLanMessage(message.message),senderId:message.senderId});return;
+      const game=validateLanMessage(message.message);
+      // Older central servers relay an individual leave before peer-left.
+      // Only the server's room-level messages may end this client's match.
+      if(game.type==='leave')return;
+      onMessage({...game,senderId:message.senderId});return;
     }
     if(message.type==='round-start'||message.type==='round-ended'){report({phase:message.type,...message});onMessage({...message,version:1});return;}
     if(message.type==='death-confirmed'||message.type==='proof-rejected'){

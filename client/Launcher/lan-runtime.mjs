@@ -8,7 +8,7 @@ import {createLanPeer} from './lan-transport.mjs';
 import {createCentralPeer} from './central-transport.mjs';
 import {startCoinHud} from './coin-hud.mjs';
 import {addKillFeed} from './kill-feed.mjs';
-import {writeHudHint} from './hud-state.mjs';
+import {writeHudHint,createHudStateWriter} from './hud-state.mjs';
 const support=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(support,'..'),game=path.join(root,'App_Executables');
 const readJson=file=>JSON.parse(fs.readFileSync(file,'utf8').replace(/^\uFEFF/,''));
@@ -22,19 +22,24 @@ const startPath=path.join(support,'lan-start.json');
 const lobbyCommandPath=path.join(support,'lan-lobby-command.json'),lobbyResultPath=path.join(support,'lan-lobby-result.json');
 const logPath=path.join(support,'last-session.log');
 const lootHintPath=path.join(support,'loot-hint.json');
+const spectatorPath=path.join(support,'pause-spectator-state.json'),spectatorWriter=createHudStateWriter(spectatorPath);
+const weaponNames=new Map(readJson(path.join(support,'loadouts.json')).weapons.map(w=>[w.id,w.name]));
 const chatStatePath=path.join(support,'pause-chat-state.json');
 const chatMessages=[];let chatError='',chatErrorAt=0;
 const feedPath=path.join(support,'pause-kill-feed.json'),feedEvents=[];
-const saveFeed=()=>fs.writeFileSync(feedPath,JSON.stringify({gamePid:pid||0,localPlayerId:peer?.playerId||'',events:feedEvents}));
-const saveChat=()=>fs.writeFileSync(chatStatePath,JSON.stringify({gamePid:pid||0,mode:peer?.match?.mode||options.matchMode||'duel',messages:chatMessages,error:chatError,errorAt:chatErrorAt}));
+const feedWriter=createHudStateWriter(feedPath),chatWriter=createHudStateWriter(chatStatePath),
+  statusWriter=createHudStateWriter(statusPath),lobbyResultWriter=createHudStateWriter(lobbyResultPath);
+const saveFeed=()=>feedWriter.write({gamePid:pid||0,localPlayerId:peer?.playerId||'',events:feedEvents});
+const saveChat=()=>chatWriter.write({gamePid:pid||0,mode:peer?.match?.mode||options.matchMode||'duel',messages:chatMessages,error:chatError,errorAt:chatErrorAt});
 for(const file of fs.readdirSync(support))if(/^pause-chat-send-[a-z0-9-]+\.json$/i.test(file))try{fs.unlinkSync(path.join(support,file));}catch{}
 try{fs.unlinkSync(lootHintPath);}catch{}
+try{fs.unlinkSync(spectatorPath);}catch{}
 fs.writeFileSync(logPath,'');
 try{fs.unlinkSync(cancelPath);}catch{}
 try{fs.unlinkSync(startPath);}catch{}
 for(const file of [lobbyCommandPath,lobbyResultPath])try{fs.unlinkSync(file);}catch{}
 const log=(kind,details={})=>fs.appendFileSync(logPath,JSON.stringify({time:new Date().toISOString(),kind,...details})+'\n');
-const status=(phase,message,details={})=>fs.writeFileSync(statusPath,JSON.stringify({...details,phase,message,time:new Date().toISOString()}));
+const status=(phase,message,details={})=>statusWriter.write({...details,phase,message,time:new Date().toISOString()});
 // Record unexpected callback failures before Node exits; do not swallow them
 // or leave a partially failed transport running.
 process.on('uncaughtExceptionMonitor',error=>{
@@ -56,6 +61,7 @@ const cleanMenu=()=>{
 const stop=async(reason,error=false)=>{
   if(closing)return;closing=true;
   endReason=reason;
+  spectatorWriter.write({gamePid:pid||0,active:false});
   if(error)failureReason=reason;
   try{fs.unlinkSync(lootHintPath);}catch{}
   status(error?'error':'ended',reason);
@@ -67,6 +73,7 @@ const stop=async(reason,error=false)=>{
   if(rpcReady){try{await script.exports.menucommand('quit');}catch{}}
 };
 const keepAlive=setInterval(()=>{
+  for(const writer of [feedWriter,chatWriter,statusWriter,lobbyResultWriter,spectatorWriter])writer.flush();
   if(ended){clearInterval(keepAlive);return;}
   if(fs.existsSync(cancelPath))stop('LAN 대전을 종료했습니다.');
   for(const file of fs.readdirSync(support).filter(f=>/^pause-chat-send-[a-z0-9-]+\.json$/i.test(f)).sort().slice(0,20)){
@@ -91,7 +98,7 @@ const keepAlive=setInterval(()=>{
       if(command.config)update.config={...command.config,character:characterConfig(command.config.character),settings:{build:'karma290-central6',mode:1}};
       if(connected||command.roomId!==peer?.match?.roomId||!peer.updateLobby?.(update))throw Error('이미 대전이 시작됐거나 대기실 연결이 종료되었습니다.');
     }catch(error){
-      fs.writeFileSync(lobbyResultPath,JSON.stringify({requestId:command?.requestId,ok:false,message:error.message}));
+      lobbyResultWriter.write({requestId:command?.requestId,ok:false,message:error.message});
       log('lobby-command-error',{message:String(error)});
     }
   }
@@ -177,7 +184,7 @@ try{
       if(phase==='chat-denied'){chatError=detail.message;chatErrorAt=Date.now();saveChat();return;}
       if(!detail.latencyOnly)log('lan-status',detail);
       if(phase==='lobby-updated'||phase==='lobby-update-denied'){
-        fs.writeFileSync(lobbyResultPath,JSON.stringify({requestId:detail.requestId,ok:phase==='lobby-updated',message:detail.message||'',ready:detail.ready,config:detail.config}));
+        lobbyResultWriter.write({requestId:detail.requestId,ok:phase==='lobby-updated',message:detail.message||'',ready:detail.ready,config:detail.config});
       }
       if(phase==='listening'||phase==='start-denied')status('waiting',phase==='start-denied'?detail.message:
         '코드 '+(detail.code||options.code)+' · '+(detail.players||1)+' / '+(detail.maxPlayers||options.maxPlayers||2)+'명 · '+
@@ -203,7 +210,9 @@ try{
     },
     onMessage:message=>{
       if(closing||ended||matchResult||script?.isDestroyed)return;
-      if(message.type==='leave'){stop('상대가 방을 나갔습니다.');return;}
+      // A legacy relay may include one participant's leave before peer-left.
+      // Only the transport's room-level leave may end this local game.
+      if(message.type==='leave'&&!message.senderId){stop('상대가 방을 나갔습니다.');return;}
       if(rpcReady)script.exports.lanreceive(message).catch(error=>{
         // Native termination destroys the agent before the detach event may
         // arrive. Preserve that event's actual cause instead of replacing it
@@ -266,6 +275,10 @@ try{
     if(payload.event==='lan-outbound'){try{peer.send(payload.message);}catch(error){stop(String(error),true);}return;}
     if(payload.event==='lan-damage-proof'){
       if(central)try{peer.send({type:'damage-proof',proof:payload.proof});}catch(error){stop(String(error),true);}
+      return;
+    }
+    if(payload.event==='lan-spectator'){
+      spectatorWriter.write({...payload,gamePid:pid,weaponName:weaponNames.get(payload.weapon)||'',expiresAt:Date.now()+2500});
       return;
     }
     if(payload.event==='lan-loot-hint'&&typeof payload.message==='string'){

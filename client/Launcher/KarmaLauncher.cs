@@ -83,7 +83,7 @@ namespace KarmaLocal {
       watcher=new System.Windows.Forms.Timer{Interval=700};
       watcher.Tick+=(s,e)=>{
         try{using(Process p=Process.GetProcessById(gamePid)){if(p.HasExited)Close();}}catch{Close();}
-        if(lan&&!confirmExit)try{var value=new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(File.ReadAllText(Path.Combine(allowed,"lan-status.json")));matchStatus.Text=Convert.ToString(value["message"]);}catch{}
+        if(lan&&!confirmExit)try{var value=ChatFiles.ReadState(Path.Combine(allowed,"lan-status.json"));if(value!=null)matchStatus.Text=ChatFiles.Read(value,"message");}catch{}
       };
       watcher.Start();
     }
